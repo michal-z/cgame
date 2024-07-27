@@ -1,0 +1,7 @@
+* text=auto
+*.* text eol=crlf
+
+*.dll binary
+*.ttf binary
+*.pdb binary
+*.exe binary
