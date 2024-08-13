@@ -15,9 +15,9 @@
 #include <math.h>
 #include <string.h>
 
-#define LOG(fmt, ...) do \
+#define LOG(...) do \
 { \
-    fprintf(stderr, (fmt), __VA_ARGS__); \
+    fprintf(stderr, __VA_ARGS__); \
     fprintf(stderr, " (%s:%d)\n", __FILE__, __LINE__); \
 } while(0)
 

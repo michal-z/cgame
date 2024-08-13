@@ -1,8 +1,9 @@
 #pragma once
 
 #define GPU_MAX_BUFFERED_FRAMES 2
+
 #define GPU_WITH_DEBUG_LAYER 1
-#define GPU_WITH_GPU_BASED_VALIDATION 1
+#define GPU_WITH_GPU_BASED_VALIDATION 0
 
 typedef struct {
     HWND window;
