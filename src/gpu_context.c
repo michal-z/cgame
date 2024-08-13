@@ -19,4 +19,11 @@ void gpu_init_context(GpuContext *gc, HWND window) {
 #else
     VHR(CreateDXGIFactory2(0, &IID_IDXGIFactory7, &gc->dxgi_factory));
 #endif
+
+    VHR(IDXGIFactory7_EnumAdapterByGpuPreference(gc->dxgi_factory, 0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, &IID_IDXGIAdapter4, &gc->adapter));
+
+    DXGI_ADAPTER_DESC3 adapter_desc = {0};
+    VHR(IDXGIAdapter4_GetDesc3(gc->adapter, &adapter_desc));
+
+    LOG("[graphics] Adapter: %S", adapter_desc.Description);
 }
