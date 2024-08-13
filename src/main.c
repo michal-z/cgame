@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "gpu_context.h"
 
-__declspec(dllexport) extern const UINT D3D12SDKVersion = 614;
+__declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
 
 static LRESULT CALLBACK process_window_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
