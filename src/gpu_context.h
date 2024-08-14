@@ -2,8 +2,13 @@
 
 #define GPU_MAX_BUFFERED_FRAMES 2
 
+#ifndef GPU_WITH_DEBUG_LAYER
 #define GPU_WITH_DEBUG_LAYER 1
+#endif
+
+#ifndef GPU_WITH_GPU_BASED_VALIDATION
 #define GPU_WITH_GPU_BASED_VALIDATION 0
+#endif
 
 typedef struct {
     HWND window;

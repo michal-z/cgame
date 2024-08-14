@@ -49,7 +49,6 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     VHR(gc->device->lpVtbl->QueryInterface(gc->device, &IID_ID3D12InfoQueue1, &gc->debug_info_queue));
     VHR(gc->debug_info_queue->lpVtbl->SetBreakOnSeverity(gc->debug_info_queue, D3D12_MESSAGE_SEVERITY_ERROR, TRUE));
 #endif
-    //VHR(ID3D12Device14_QueryInterface(gc->device, &IID_ID3D12DebugCommandQueue1, &gc->debug_command_queue));
     LOG("[gpu_context] D3D12 device created");
 
     //
@@ -101,4 +100,17 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     VHR(gc->command_queue->lpVtbl->QueryInterface(gc->command_queue, &IID_ID3D12DebugCommandQueue1, &gc->debug_command_queue));
 #endif
     LOG("[gpu_context] Command queue created");
+
+    for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
+        VHR(gc->device->lpVtbl->CreateCommandAllocator(gc->device, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator, &gc->command_allocators[i]));
+    }
+
+    LOG("[gpu_context] Command allocators created");
+
+    VHR(gc->device->lpVtbl->CreateCommandList1(gc->device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_FLAG_NONE, &IID_ID3D12GraphicsCommandList10, &gc->command_list));
+
+#if GPU_WITH_DEBUG_LAYER
+    VHR(gc->command_list->lpVtbl->QueryInterface(gc->command_list, &IID_ID3D12DebugCommandList3, &gc->debug_command_list));
+#endif
+    LOG("[gpu_context] Command list created");
 }
