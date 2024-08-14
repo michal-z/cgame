@@ -97,6 +97,7 @@ int main(void) {
             DispatchMessage(&msg);
             if (msg.message == WM_QUIT) break;
         } else {
+            update_frame_stats(window, APP_NAME);
             Sleep(1);
         }
     }
