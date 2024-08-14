@@ -2,13 +2,9 @@
 
 #define GPU_MAX_BUFFERED_FRAMES 2
 
-#ifndef GPU_WITH_DEBUG_LAYER
-#define GPU_WITH_DEBUG_LAYER 1
-#endif
-
-#ifndef GPU_WITH_GPU_BASED_VALIDATION
-#define GPU_WITH_GPU_BASED_VALIDATION 0
-#endif
+#define GPU_ENABLE_DEBUG_LAYER 1
+#define GPU_ENABLE_GPU_BASED_VALIDATION 0
+#define GPU_ENABLE_VSYNC 1
 
 typedef struct {
     HWND window;
@@ -23,13 +19,18 @@ typedef struct {
     ID3D12CommandAllocator *command_allocators[GPU_MAX_BUFFERED_FRAMES];
     ID3D12GraphicsCommandList10 *command_list;
 
-#if GPU_WITH_DEBUG_LAYER
+#if GPU_ENABLE_DEBUG_LAYER
     ID3D12Debug6 *debug;
     ID3D12DebugDevice2 *debug_device;
     ID3D12DebugCommandQueue1 *debug_command_queue;
     ID3D12DebugCommandList3 *debug_command_list;
     ID3D12InfoQueue1 *debug_info_queue;
 #endif
+
+    IDXGISwapChain4 *swap_chain;
+    UINT swap_chain_flags;
+    UINT swap_chain_present_interval;
+    ID3D12Resource *swap_chain_buffers[GPU_MAX_BUFFERED_FRAMES];
 } GpuContext;
 
 void gpu_init_context(GpuContext *gc, HWND window);

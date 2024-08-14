@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "gpu_context.h"
 
+#define SWAP_CHAIN_TARGET_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
+#define SWAP_CHAIN_TARGET_VIEW_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
+
 void gpu_init_context(GpuContext *gc, HWND window) {
     assert(gc && gc->device == NULL);
 
@@ -14,7 +17,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     //
     // Factory, adapater, device
     //
-#if GPU_WITH_DEBUG_LAYER
+#if GPU_ENABLE_DEBUG_LAYER
     VHR(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, &IID_IDXGIFactory7, &gc->dxgi_factory));
 #else
     VHR(CreateDXGIFactory2(0, &IID_IDXGIFactory7, &gc->dxgi_factory));
@@ -27,14 +30,14 @@ void gpu_init_context(GpuContext *gc, HWND window) {
 
     LOG("[gpu_context] Adapter: %S", adapter_desc.Description);
 
-#if GPU_WITH_DEBUG_LAYER
+#if GPU_ENABLE_DEBUG_LAYER
     if (FAILED(D3D12GetDebugInterface(&IID_ID3D12Debug6, &gc->debug))) {
-        LOG("[gpu_context] Failed to load D3D12 debug layer. Please rebuild with `GPU_WITH_DEBUG_LAYER 0` and try again.");
+        LOG("[gpu_context] Failed to load D3D12 debug layer. Please rebuild with `GPU_ENABLE_DEBUG_LAYER 0` and try again.");
         ExitProcess(1);
     }
     gc->debug->lpVtbl->EnableDebugLayer(gc->debug);
     LOG("[gpu_context] D3D12 Debug Layer enabled");
-#if GPU_WITH_GPU_BASED_VALIDATION
+#if GPU_ENABLE_GPU_BASED_VALIDATION
     ID3D12Debug6_SetEnableGPUBasedValidation(gc->debug, TRUE);
     LOG("[gpu_context] D3D12 GPU-Based Validation enabled");
 #endif
@@ -44,7 +47,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         ExitProcess(1);
     }
 
-#if GPU_WITH_DEBUG_LAYER
+#if GPU_ENABLE_DEBUG_LAYER
     VHR(gc->device->lpVtbl->QueryInterface(gc->device, &IID_ID3D12DebugDevice2, &gc->debug_device));
     VHR(gc->device->lpVtbl->QueryInterface(gc->device, &IID_ID3D12InfoQueue1, &gc->debug_info_queue));
     VHR(gc->debug_info_queue->lpVtbl->SetBreakOnSeverity(gc->debug_info_queue, D3D12_MESSAGE_SEVERITY_ERROR, TRUE));
@@ -93,10 +96,9 @@ void gpu_init_context(GpuContext *gc, HWND window) {
             .Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
             .Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
             .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
-        },
-        &IID_ID3D12CommandQueue, &gc->command_queue));
+        }, &IID_ID3D12CommandQueue, &gc->command_queue));
 
-#if GPU_WITH_DEBUG_LAYER
+#if GPU_ENABLE_DEBUG_LAYER
     VHR(gc->command_queue->lpVtbl->QueryInterface(gc->command_queue, &IID_ID3D12DebugCommandQueue1, &gc->debug_command_queue));
 #endif
     LOG("[gpu_context] Command queue created");
@@ -109,8 +111,55 @@ void gpu_init_context(GpuContext *gc, HWND window) {
 
     VHR(gc->device->lpVtbl->CreateCommandList1(gc->device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_FLAG_NONE, &IID_ID3D12GraphicsCommandList10, &gc->command_list));
 
-#if GPU_WITH_DEBUG_LAYER
+#if GPU_ENABLE_DEBUG_LAYER
     VHR(gc->command_list->lpVtbl->QueryInterface(gc->command_list, &IID_ID3D12DebugCommandList3, &gc->debug_command_list));
 #endif
     LOG("[gpu_context] Command list created");
+
+    //
+    // Swap chain
+    //
+    /* Swap chain flags */ {
+        gc->swap_chain_flags = 0;
+        gc->swap_chain_present_interval = GPU_ENABLE_VSYNC;
+
+        BOOL allow_tearing = FALSE;
+        const HRESULT hr = gc->dxgi_factory->lpVtbl->CheckFeatureSupport(gc->dxgi_factory, DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allow_tearing, sizeof(allow_tearing));
+
+        if (SUCCEEDED(hr) && allow_tearing == TRUE) {
+            gc->swap_chain_flags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+        }
+#if GPU_ENABLE_VSYNC
+        LOG("[gpu_context] VSync is enabled");
+#else
+        LOG("[gpu_context] VSync is disabled");
+#endif
+    }
+
+    IDXGISwapChain1 *swap_chain1 = NULL;
+    VHR(gc->dxgi_factory->lpVtbl->CreateSwapChainForHwnd(gc->dxgi_factory, (IUnknown *)gc->command_queue, window,
+        &(DXGI_SWAP_CHAIN_DESC1){
+            .Width = gc->viewport_width,
+            .Height = gc->viewport_height,
+            .Format = SWAP_CHAIN_TARGET_FORMAT,
+            .Stereo = FALSE,
+            .SampleDesc = { .Count = 1 },
+            .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
+            .BufferCount = GPU_MAX_BUFFERED_FRAMES,
+            .Scaling = DXGI_SCALING_NONE,
+            .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
+            .AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED,
+            .Flags = gc->swap_chain_flags,
+        }, NULL, NULL, &swap_chain1));
+
+    VHR(swap_chain1->lpVtbl->QueryInterface(swap_chain1, &IID_IDXGISwapChain4, &gc->swap_chain));
+    SAFE_RELEASE(swap_chain1);
+
+    VHR(gc->dxgi_factory->lpVtbl->MakeWindowAssociation(gc->dxgi_factory, window, DXGI_MWA_NO_WINDOW_CHANGES));
+
+    for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
+        VHR(gc->swap_chain->lpVtbl->GetBuffer(gc->swap_chain, i, &IID_ID3D12Resource, &gc->swap_chain_buffers[i]));
+    }
+
+    LOG("[gpu_context] Swap chain created");
 }

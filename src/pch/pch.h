@@ -32,7 +32,7 @@
 #define SAFE_RELEASE(obj) do \
 { \
     if ((obj)) { \
-        (obj)->Release(); \
+        (obj)->lpVtbl->Release((obj)); \
         (obj) = NULL; \
     } \
 } while(0)
