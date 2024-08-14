@@ -59,7 +59,7 @@ static float update_frame_stats(HWND window, const char *name) {
 }
 
 static HWND create_window(const char* name, int32_t width, int32_t height) {
-    RegisterClassA(&(WNDCLASSA){
+    RegisterClass(&(WNDCLASSA){
         .lpfnWndProc = process_window_message,
         .hInstance = GetModuleHandleA(NULL),
         .hCursor = LoadCursorA(NULL, IDC_ARROW),

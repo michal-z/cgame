@@ -20,34 +20,85 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     VHR(CreateDXGIFactory2(0, &IID_IDXGIFactory7, &gc->dxgi_factory));
 #endif
 
-    VHR(IDXGIFactory7_EnumAdapterByGpuPreference(gc->dxgi_factory, 0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, &IID_IDXGIAdapter4, &gc->adapter));
+    VHR(gc->dxgi_factory->lpVtbl->EnumAdapterByGpuPreference(gc->dxgi_factory, 0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, &IID_IDXGIAdapter4, &gc->adapter));
 
     DXGI_ADAPTER_DESC3 adapter_desc = {0};
-    VHR(IDXGIAdapter4_GetDesc3(gc->adapter, &adapter_desc));
+    VHR(gc->adapter->lpVtbl->GetDesc3(gc->adapter, &adapter_desc));
 
-    LOG("[graphics] Adapter: %S", adapter_desc.Description);
+    LOG("[gpu_context] Adapter: %S", adapter_desc.Description);
 
 #if GPU_WITH_DEBUG_LAYER
     if (FAILED(D3D12GetDebugInterface(&IID_ID3D12Debug6, &gc->debug))) {
-        LOG("[graphics] Failed to load D3D12 debug layer. Please rebuild with `GPU_WITH_DEBUG_LAYER 0` and try again.");
+        LOG("[gpu_context] Failed to load D3D12 debug layer. Please rebuild with `GPU_WITH_DEBUG_LAYER 0` and try again.");
         ExitProcess(1);
     }
-    ID3D12Debug6_EnableDebugLayer(gc->debug);
-    LOG("[graphics] D3D12 Debug Layer enabled");
+    gc->debug->lpVtbl->EnableDebugLayer(gc->debug);
+    LOG("[gpu_context] D3D12 Debug Layer enabled");
 #if GPU_WITH_GPU_BASED_VALIDATION
     ID3D12Debug6_SetEnableGPUBasedValidation(gc->debug, TRUE);
-    LOG("[graphics] D3D12 GPU-Based Validation enabled");
+    LOG("[gpu_context] D3D12 GPU-Based Validation enabled");
 #endif
 #endif
     if (FAILED(D3D12CreateDevice((IUnknown *)gc->adapter, D3D_FEATURE_LEVEL_11_1, &IID_ID3D12Device14, &gc->device))) {
-        // TODO: MessageBox()
+        MessageBox(window, "Failed to create Direct3D 12 Device. This applications requires graphics card with FEATURE LEVEL 11.1 support. Please update your graphics driver and try again.", "DirectX 12 initialization error", MB_OK | MB_ICONERROR);
         ExitProcess(1);
     }
 
-#if 0//WITH_D3D12_DEBUG_LAYER
-    VHR(gc->device->QueryInterface(IID_PPV_ARGS(&gc->debug_device)));
-    VHR(gc->device->QueryInterface(IID_PPV_ARGS(&gc->debug_info_queue)));
-    VHR(gc->debug_info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE));
+#if GPU_WITH_DEBUG_LAYER
+    VHR(gc->device->lpVtbl->QueryInterface(gc->device, &IID_ID3D12DebugDevice2, &gc->debug_device));
+    VHR(gc->device->lpVtbl->QueryInterface(gc->device, &IID_ID3D12InfoQueue1, &gc->debug_info_queue));
+    VHR(gc->debug_info_queue->lpVtbl->SetBreakOnSeverity(gc->debug_info_queue, D3D12_MESSAGE_SEVERITY_ERROR, TRUE));
 #endif
-    LOG("[graphics] D3D12 device created");
+    //VHR(ID3D12Device14_QueryInterface(gc->device, &IID_ID3D12DebugCommandQueue1, &gc->debug_command_queue));
+    LOG("[gpu_context] D3D12 device created");
+
+    //
+    // Check required features support
+    //
+    {
+        D3D12_FEATURE_DATA_D3D12_OPTIONS options = {0};
+        D3D12_FEATURE_DATA_D3D12_OPTIONS12 options12 = {0};
+        D3D12_FEATURE_DATA_SHADER_MODEL shader_model = { .HighestShaderModel = D3D_HIGHEST_SHADER_MODEL };
+
+        VHR(gc->device->lpVtbl->CheckFeatureSupport(gc->device, D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options)));
+        VHR(gc->device->lpVtbl->CheckFeatureSupport(gc->device, D3D12_FEATURE_D3D12_OPTIONS12, &options12, sizeof(options12)));
+        VHR(gc->device->lpVtbl->CheckFeatureSupport(gc->device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model)));
+
+        bool is_supported = true;
+        if (options.ResourceBindingTier < D3D12_RESOURCE_BINDING_TIER_3) {
+            LOG("[gpu_context] Resource Binding Tier 3 is NOT SUPPORTED - please update your driver");
+            is_supported = false;
+        } else LOG("[gpu_context] Resource Binding Tier 3 is SUPPORTED");
+
+        if (options12.EnhancedBarriersSupported == FALSE) {
+            LOG("[gpu_context] Enhanced Barriers API is NOT SUPPORTED - please update your driver");
+            is_supported = false;
+        } else LOG("[gpu_context] Enhanced Barriers API is SUPPORTED");
+
+        if (shader_model.HighestShaderModel < D3D_SHADER_MODEL_6_6) {
+            LOG("[gpu_context] Shader Model 6.6 is NOT SUPPORTED - please update your driver");
+            is_supported = false;
+        } else LOG("[gpu_context] Shader Model 6.6 is SUPPORTED");
+
+        if (!is_supported) {
+            MessageBox(window, "Your graphics card does not support some required features. Please update your graphics driver and try again.", "DirectX 12 initialization error", MB_OK | MB_ICONERROR);
+            ExitProcess(1);
+        }
+    }
+
+    //
+    // Commands
+    //
+    VHR(gc->device->lpVtbl->CreateCommandQueue(gc->device,
+        &(D3D12_COMMAND_QUEUE_DESC){
+            .Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
+            .Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
+            .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
+        },
+        &IID_ID3D12CommandQueue, &gc->command_queue));
+
+#if GPU_WITH_DEBUG_LAYER
+    VHR(gc->command_queue->lpVtbl->QueryInterface(gc->command_queue, &IID_ID3D12DebugCommandQueue1, &gc->debug_command_queue));
+#endif
+    LOG("[gpu_context] Command queue created");
 }
