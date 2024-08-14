@@ -1,9 +1,6 @@
 #include "pch.h"
 #include "gpu_context.h"
 
-#define SWAP_CHAIN_TARGET_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
-#define SWAP_CHAIN_TARGET_VIEW_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
-
 void gpu_init_context(GpuContext *gc, HWND window) {
     assert(gc && gc->device == NULL);
 
@@ -141,7 +138,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         &(DXGI_SWAP_CHAIN_DESC1){
             .Width = gc->viewport_width,
             .Height = gc->viewport_height,
-            .Format = SWAP_CHAIN_TARGET_FORMAT,
+            .Format = GPU_SWAP_CHAIN_TARGET_FORMAT,
             .Stereo = FALSE,
             .SampleDesc = { .Count = 1 },
             .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
