@@ -159,4 +159,25 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     }
 
     LOG("[gpu_context] Swap chain created");
+
+    //
+    // RTV descriptor heap
+    //
+    VHR(gc->device->lpVtbl->CreateDescriptorHeap(gc->device,
+        &(D3D12_DESCRIPTOR_HEAP_DESC){
+            .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+            .NumDescriptors = 1024,
+            .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+        }, &IID_ID3D12DescriptorHeap, &gc->rtv_dheap));
+    gc->rtv_dheap->lpVtbl->GetCPUDescriptorHandleForHeapStart(gc->rtv_dheap, &gc->rtv_dheap_start);
+    gc->rtv_dheap_descriptor_size = gc->device->lpVtbl->GetDescriptorHandleIncrementSize(gc->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+    for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
+        gc->device->lpVtbl->CreateRenderTargetView(gc->device, gc->swap_chain_buffers[i], NULL,
+            (D3D12_CPU_DESCRIPTOR_HANDLE){
+                .ptr = gc->rtv_dheap_start.ptr + i * gc->rtv_dheap_descriptor_size
+            });
+    }
+
+    LOG("[gpu_context] Render target view (RTV) descriptor heap created");
 }
