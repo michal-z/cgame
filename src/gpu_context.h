@@ -7,7 +7,8 @@
 #define GPU_SWAP_CHAIN_TARGET_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 #define GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 
-typedef struct GpuContext {
+typedef struct GpuContext
+{
     HWND window;
     int32_t viewport_width;
     int32_t viewport_height;
