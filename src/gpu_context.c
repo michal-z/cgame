@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "cobjmacros.h"
 #include "gpu_context.h"
 
 void gpu_init_context(GpuContext *gc, HWND window) {
