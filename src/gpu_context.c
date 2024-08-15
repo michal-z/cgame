@@ -1,7 +1,9 @@
 #include "pch.h"
 #include "gpu_context.h"
 
-void gpu_init_context(GpuContext *gc, HWND window) {
+void
+gpu_init_context(GpuContext *gc, HWND window)
+{
     assert(gc && gc->device == NULL);
 
     RECT rect = {0};

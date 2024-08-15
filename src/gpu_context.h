@@ -7,7 +7,7 @@
 #define GPU_SWAP_CHAIN_TARGET_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 #define GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 
-struct GpuContext {
+typedef struct GpuContext {
     HWND window;
     int32_t viewport_width;
     int32_t viewport_height;
@@ -41,7 +41,6 @@ struct GpuContext {
     D3D12_CPU_DESCRIPTOR_HANDLE shader_dheap_start_cpu;
     D3D12_GPU_DESCRIPTOR_HANDLE shader_dheap_start_gpu;
     UINT shader_dheap_descriptor_size;
-};
-typedef struct GpuContext GpuContext;
+} GpuContext;
 
 void gpu_init_context(GpuContext *gc, HWND window);

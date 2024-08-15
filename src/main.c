@@ -4,7 +4,9 @@
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
 
-static LRESULT CALLBACK process_window_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
+static LRESULT CALLBACK
+process_window_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+{
     switch (message) {
         case WM_DESTROY:
             PostQuitMessage(0);
@@ -19,7 +21,9 @@ static LRESULT CALLBACK process_window_message(HWND hwnd, UINT message, WPARAM w
     return DefWindowProcA(hwnd, message, wparam, lparam);
 }
 
-static double get_time(void) {
+static double
+get_time(void)
+{
     static LARGE_INTEGER start_counter;
     static LARGE_INTEGER frequency;
     if (start_counter.QuadPart == 0) {
@@ -28,10 +32,13 @@ static double get_time(void) {
     }
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
-    return (double)(counter.QuadPart - start_counter.QuadPart) / (double)frequency.QuadPart;
+    return (double)(counter.QuadPart - start_counter.QuadPart) /
+        (double)frequency.QuadPart;
 }
 
-static float update_frame_stats(HWND window, const char *name) {
+static float
+update_frame_stats(HWND window, const char *name)
+{
     static double previous_time = -1.0;
     static double header_refresh_time = 0.0;
     static uint32_t num_frames = 0;
@@ -58,7 +65,9 @@ static float update_frame_stats(HWND window, const char *name) {
     return delta_time;
 }
 
-static HWND create_window(const char* name, int32_t width, int32_t height) {
+static HWND
+create_window(const char* name, int32_t width, int32_t height)
+{
     RegisterClass(&(WNDCLASSA){
         .lpfnWndProc = process_window_message,
         .hInstance = GetModuleHandleA(NULL),
@@ -71,9 +80,21 @@ static HWND create_window(const char* name, int32_t width, int32_t height) {
     RECT rect = { 0, 0, width, height };
     AdjustWindowRectEx(&rect, style, FALSE, 0);
 
-    HWND window = CreateWindowEx(0, name, name, style | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, NULL, NULL);
-    if (!window)
-        VHR(HRESULT_FROM_WIN32(GetLastError()));
+    HWND window = CreateWindowEx(
+        0,
+        name,
+        name,
+        style | WS_VISIBLE,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        rect.right - rect.left,
+        rect.bottom - rect.top,
+        NULL,
+        NULL,
+        NULL,
+        NULL);
+
+    if (!window) VHR(HRESULT_FROM_WIN32(GetLastError()));
 
     return window;
 }
@@ -82,7 +103,9 @@ static HWND create_window(const char* name, int32_t width, int32_t height) {
 #define APP_WIN_WIDTH 1600
 #define APP_WIN_HEIGHT 1200
 
-int main(void) {
+int
+main(void)
+{
     SetProcessDPIAware();
 
     HWND window = create_window(APP_NAME, APP_WIN_WIDTH, APP_WIN_HEIGHT);
