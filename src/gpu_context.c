@@ -23,7 +23,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         0, &IID_IDXGIFactory7, &gc->dxgi_factory));
 #endif
 
-    VHR(gc->dxgi_factory->lpVtbl->EnumAdapterByGpuPreference(
+    VHR(IDXGIFactory7_EnumAdapterByGpuPreference(
         gc->dxgi_factory,
         0,
         DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
@@ -31,7 +31,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         &gc->adapter));
 
     DXGI_ADAPTER_DESC3 adapter_desc = {0};
-    VHR(gc->adapter->lpVtbl->GetDesc3(gc->adapter, &adapter_desc));
+    VHR(IDXGIAdapter4_GetDesc3(gc->adapter, &adapter_desc));
 
     LOG("[gpu_context] Adapter: %S", adapter_desc.Description);
 
@@ -41,7 +41,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
             "Please rebuild with `GPU_ENABLE_DEBUG_LAYER 0` and try again.");
         ExitProcess(1);
     }
-    gc->debug->lpVtbl->EnableDebugLayer(gc->debug);
+    ID3D12Debug6_EnableDebugLayer(gc->debug);
     LOG("[gpu_context] D3D12 Debug Layer enabled");
 #if GPU_ENABLE_GPU_BASED_VALIDATION
     ID3D12Debug6_SetEnableGPUBasedValidation(gc->debug, TRUE);
@@ -65,13 +65,13 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     }
 
 #if GPU_ENABLE_DEBUG_LAYER
-    VHR(ID3D12Device_QueryInterface(
+    VHR(ID3D12Device14_QueryInterface(
         gc->device, &IID_ID3D12DebugDevice2, &gc->debug_device));
 
-    VHR(ID3D12Device_QueryInterface(
+    VHR(ID3D12Device14_QueryInterface(
         gc->device, &IID_ID3D12InfoQueue1, &gc->debug_info_queue));
 
-    VHR(gc->debug_info_queue->lpVtbl->SetBreakOnSeverity(
+    VHR(ID3D12InfoQueue1_SetBreakOnSeverity(
         gc->debug_info_queue, D3D12_MESSAGE_SEVERITY_ERROR, TRUE));
 #endif
     LOG("[gpu_context] D3D12 device created");
@@ -81,11 +81,11 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     //
     {
         D3D12_FEATURE_DATA_D3D12_OPTIONS options = {0};
-        VHR(ID3D12Device_CheckFeatureSupport(
+        VHR(ID3D12Device14_CheckFeatureSupport(
             gc->device, D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options)));
 
         D3D12_FEATURE_DATA_D3D12_OPTIONS12 options12 = {0};
-        VHR(ID3D12Device_CheckFeatureSupport(
+        VHR(ID3D12Device14_CheckFeatureSupport(
             gc->device,
             D3D12_FEATURE_D3D12_OPTIONS12,
             &options12,
@@ -94,7 +94,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         D3D12_FEATURE_DATA_SHADER_MODEL shader_model = {
             .HighestShaderModel = D3D_HIGHEST_SHADER_MODEL
         };
-        VHR(ID3D12Device_CheckFeatureSupport(
+        VHR(ID3D12Device14_CheckFeatureSupport(
             gc->device,
             D3D12_FEATURE_SHADER_MODEL,
             &shader_model,
@@ -133,7 +133,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     //
     // Commands
     //
-    VHR(ID3D12Device_CreateCommandQueue(
+    VHR(ID3D12Device14_CreateCommandQueue(
         gc->device,
         &(D3D12_COMMAND_QUEUE_DESC){
             .Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -144,7 +144,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         &gc->command_queue));
 
 #if GPU_ENABLE_DEBUG_LAYER
-    VHR(gc->command_queue->lpVtbl->QueryInterface(
+    VHR(ID3D12CommandQueue_QueryInterface(
         gc->command_queue,
         &IID_ID3D12DebugCommandQueue1,
         &gc->debug_command_queue));
@@ -152,7 +152,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     LOG("[gpu_context] Command queue created");
 
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-        VHR(ID3D12Device_CreateCommandAllocator(
+        VHR(ID3D12Device14_CreateCommandAllocator(
             gc->device,
             D3D12_COMMAND_LIST_TYPE_DIRECT,
             &IID_ID3D12CommandAllocator,
@@ -161,7 +161,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
 
     LOG("[gpu_context] Command allocators created");
 
-    VHR(ID3D12Device_CreateCommandList1(
+    VHR(ID3D12Device14_CreateCommandList1(
         gc->device,
         0,
         D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -170,7 +170,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         &gc->command_list));
 
 #if GPU_ENABLE_DEBUG_LAYER
-    VHR(gc->command_list->lpVtbl->QueryInterface(
+    VHR(ID3D12GraphicsCommandList10_QueryInterface(
         gc->command_list, &IID_ID3D12DebugCommandList3, &gc->debug_command_list));
 #endif
     LOG("[gpu_context] Command list created");
@@ -183,7 +183,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         gc->swap_chain_present_interval = GPU_ENABLE_VSYNC;
 
         BOOL allow_tearing = FALSE;
-        const HRESULT hr = gc->dxgi_factory->lpVtbl->CheckFeatureSupport(
+        const HRESULT hr = IDXGIFactory7_CheckFeatureSupport(
             gc->dxgi_factory,
             DXGI_FEATURE_PRESENT_ALLOW_TEARING,
             &allow_tearing,
@@ -200,7 +200,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     }
 
     IDXGISwapChain1 *swap_chain1 = NULL;
-    VHR(gc->dxgi_factory->lpVtbl->CreateSwapChainForHwnd(
+    VHR(IDXGIFactory7_CreateSwapChainForHwnd(
         gc->dxgi_factory,
         (IUnknown *)gc->command_queue,
         window,
@@ -221,15 +221,15 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         NULL,
         &swap_chain1));
 
-    VHR(swap_chain1->lpVtbl->QueryInterface(
+    VHR(IDXGISwapChain1_QueryInterface(
         swap_chain1, &IID_IDXGISwapChain4, &gc->swap_chain));
     SAFE_RELEASE(swap_chain1);
 
-    VHR(gc->dxgi_factory->lpVtbl->MakeWindowAssociation(
+    VHR(IDXGIFactory7_MakeWindowAssociation(
         gc->dxgi_factory, window, DXGI_MWA_NO_WINDOW_CHANGES));
 
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-        VHR(gc->swap_chain->lpVtbl->GetBuffer(
+        VHR(IDXGISwapChain4_GetBuffer(
             gc->swap_chain, i, &IID_ID3D12Resource, &gc->swap_chain_buffers[i]));
     }
 
@@ -238,7 +238,7 @@ void gpu_init_context(GpuContext *gc, HWND window) {
     //
     // RTV descriptor heap
     //
-    VHR(ID3D12Device_CreateDescriptorHeap(
+    VHR(ID3D12Device14_CreateDescriptorHeap(
         gc->device,
         &(D3D12_DESCRIPTOR_HEAP_DESC){
             .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
@@ -248,16 +248,17 @@ void gpu_init_context(GpuContext *gc, HWND window) {
         &IID_ID3D12DescriptorHeap,
         &gc->rtv_dheap));
 
-    gc->rtv_dheap->lpVtbl->GetCPUDescriptorHandleForHeapStart(
+    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(
         gc->rtv_dheap,
         &gc->rtv_dheap_start);
 
-    gc->rtv_dheap_descriptor_size = ID3D12Device_GetDescriptorHandleIncrementSize(
-        gc->device,
-        D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    gc->rtv_dheap_descriptor_size =
+        ID3D12Device14_GetDescriptorHandleIncrementSize(
+            gc->device,
+            D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-        ID3D12Device_CreateRenderTargetView(
+        ID3D12Device14_CreateRenderTargetView(
             gc->device,
             gc->swap_chain_buffers[i],
             NULL,
