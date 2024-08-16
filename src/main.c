@@ -100,17 +100,60 @@ create_window(const char* name, int32_t width, int32_t height)
   return window;
 }
 
-#define WINDOW_NAME "cgame"
+typedef struct GameState {
+  const char *name;
+  GpuContext *gpu_context;
+} GameState;
+
+static void
+game_init(GameState *game_state)
+{
+  assert(game_state && game_state->name != NULL);
+
+  HWND window = create_window(game_state->name, 1600, 1200);
+
+  game_state->gpu_context = malloc(sizeof(GpuContext));
+  memset(game_state->gpu_context, 0, sizeof(GpuContext));
+
+  gpu_init_context(game_state->gpu_context, window);
+}
+
+static void
+game_update(GameState *game_state)
+{
+  GpuContext *gc = game_state->gpu_context;
+
+  update_frame_stats(gc->window, game_state->name);
+  if (gpu_handle_window_resize(gc) == GpuWindowState_Resized) {
+    // ...
+  }
+}
+
+static void
+game_draw(GameState *game_state)
+{
+  GpuContext *gc = game_state->gpu_context;
+
+  gpu_present_frame(gc);
+}
+
+static void
+game_deinit(GameState *game_state)
+{
+  GpuContext *gc = game_state->gpu_context;
+
+  gpu_finish_commands(gc);
+  gpu_deinit_context(gc);
+  free(gc);
+}
 
 int
 main(void)
 {
   SetProcessDPIAware();
 
-  HWND window = create_window(WINDOW_NAME, 1600, 1200);
-
-  GpuContext gpu_context = {0};
-  gpu_init_context(&gpu_context, window);
+  GameState game_state = { .name = "cgame" };
+  game_init(&game_state);
 
   while (true) {
     MSG msg = {0};
@@ -119,16 +162,12 @@ main(void)
       DispatchMessage(&msg);
       if (msg.message == WM_QUIT) break;
     } else {
-      update_frame_stats(window, WINDOW_NAME);
-      if (gpu_handle_window_resize(&gpu_context) == GpuWindowState_Resized) {
-        // ...
-      }
-      gpu_present_frame(&gpu_context);
+      game_update(&game_state);
+      game_draw(&game_state);
     }
   }
 
-  gpu_finish_commands(&gpu_context);
-  gpu_deinit_context(&gpu_context);
+  game_deinit(&game_state);
 
   return 0;
 }
