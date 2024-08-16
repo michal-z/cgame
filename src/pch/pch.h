@@ -49,3 +49,7 @@
 #undef ID3D12Device14_CreateDescriptorHeap
 #define ID3D12Device14_CreateDescriptorHeap(This,...)	\
   ( (This)->lpVtbl -> CreateDescriptorHeap(This,__VA_ARGS__) )
+
+#undef ID3D12Device14_CreateRenderTargetView
+#define ID3D12Device14_CreateRenderTargetView(This,...)	\
+  ( (This)->lpVtbl -> CreateRenderTargetView(This,__VA_ARGS__) )

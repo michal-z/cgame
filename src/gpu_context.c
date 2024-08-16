@@ -1,10 +1,6 @@
 #include "pch.h"
 #include "gpu_context.h"
 
-#define MAX_RTV_DESCRIPTORS 64
-#define MAX_DSV_DESCRIPTORS 64
-#define MAX_SHADER_DESCRIPTORS (32 * 1024)
-
 void
 gpu_init_context(GpuContext *gc, HWND window)
 {
@@ -247,7 +243,7 @@ gpu_init_context(GpuContext *gc, HWND window)
     gc->device,
     &(D3D12_DESCRIPTOR_HEAP_DESC){
       .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-      .NumDescriptors = MAX_RTV_DESCRIPTORS,
+      .NumDescriptors = GPU_MAX_RTV_DESCRIPTORS,
       .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
     },
     &IID_ID3D12DescriptorHeap,
@@ -265,7 +261,10 @@ gpu_init_context(GpuContext *gc, HWND window)
     ID3D12Device14_CreateRenderTargetView(
       gc->device,
       gc->swap_chain_buffers[i],
-      NULL,
+      &(D3D12_RENDER_TARGET_VIEW_DESC){
+        .Format = GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT,
+        .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+      },
       (D3D12_CPU_DESCRIPTOR_HANDLE){
         .ptr = gc->rtv_dheap_start.ptr + i * gc->rtv_dheap_descriptor_size
       });
@@ -274,7 +273,7 @@ gpu_init_context(GpuContext *gc, HWND window)
   LOG(
     "[gpu_context] Render target view (RTV) descriptor heap created "
     "(NumDescriptors: %d, DescriptorSize: %d)",
-    MAX_RTV_DESCRIPTORS,
+    GPU_MAX_RTV_DESCRIPTORS,
     gc->rtv_dheap_descriptor_size);
 
   //
@@ -284,7 +283,7 @@ gpu_init_context(GpuContext *gc, HWND window)
     gc->device,
     &(D3D12_DESCRIPTOR_HEAP_DESC){
       .Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
-      .NumDescriptors = MAX_DSV_DESCRIPTORS,
+      .NumDescriptors = GPU_MAX_DSV_DESCRIPTORS,
       .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
     },
     &IID_ID3D12DescriptorHeap,
@@ -301,7 +300,7 @@ gpu_init_context(GpuContext *gc, HWND window)
   LOG(
     "[gpu_context] Depth-stencil view (DSV) descriptor heap created "
     "(NumDescriptors: %d, DescriptorSize: %d)",
-    MAX_DSV_DESCRIPTORS,
+    GPU_MAX_DSV_DESCRIPTORS,
     gc->dsv_dheap_descriptor_size);
 
   //
@@ -311,7 +310,7 @@ gpu_init_context(GpuContext *gc, HWND window)
     gc->device,
     &(D3D12_DESCRIPTOR_HEAP_DESC){
       .Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-      .NumDescriptors = MAX_SHADER_DESCRIPTORS,
+      .NumDescriptors = GPU_MAX_SHADER_DESCRIPTORS,
       .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
     },
     &IID_ID3D12DescriptorHeap,
@@ -332,7 +331,7 @@ gpu_init_context(GpuContext *gc, HWND window)
   LOG(
     "[gpu_context] Shader view (CBV, SRV, UAV) descriptor heap created "
     "(NumDescriptors: %d, DescriptorSize: %d)",
-    MAX_SHADER_DESCRIPTORS,
+    GPU_MAX_SHADER_DESCRIPTORS,
     gc->shader_dheap_descriptor_size);
 
   //
@@ -480,7 +479,10 @@ gpu_handle_window_resize(GpuContext *gc)
       ID3D12Device14_CreateRenderTargetView(
         gc->device,
         gc->swap_chain_buffers[i],
-        NULL,
+        &(D3D12_RENDER_TARGET_VIEW_DESC){
+          .Format = GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT,
+          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+        },
         (D3D12_CPU_DESCRIPTOR_HANDLE){
           .ptr = gc->rtv_dheap_start.ptr + i * gc->rtv_dheap_descriptor_size
         });

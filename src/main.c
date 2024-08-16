@@ -53,8 +53,8 @@ update_frame_stats(HWND window, const char *name)
   previous_time = time;
 
   if ((time - header_refresh_time) >= 1.0) {
-    const double fps = num_frames / (time - header_refresh_time);
-    const double ms = (1.0 / fps) * 1000.0;
+    double fps = num_frames / (time - header_refresh_time);
+    double ms = (1.0 / fps) * 1000.0;
     char header[128];
     snprintf(header, sizeof(header), "[%.1f fps  %.3f ms] %s", fps, ms, name);
     SetWindowText(window, header);
@@ -100,16 +100,14 @@ create_window(const char* name, int32_t width, int32_t height)
   return window;
 }
 
-#define APP_NAME "cgame"
-#define APP_WIN_WIDTH 1600
-#define APP_WIN_HEIGHT 1200
+#define WINDOW_NAME "cgame"
 
 int
 main(void)
 {
   SetProcessDPIAware();
 
-  HWND window = create_window(APP_NAME, APP_WIN_WIDTH, APP_WIN_HEIGHT);
+  HWND window = create_window(WINDOW_NAME, 1600, 1200);
 
   GpuContext gpu_context = {0};
   gpu_init_context(&gpu_context, window);
@@ -121,7 +119,7 @@ main(void)
       DispatchMessage(&msg);
       if (msg.message == WM_QUIT) break;
     } else {
-      update_frame_stats(window, APP_NAME);
+      update_frame_stats(window, WINDOW_NAME);
       if (gpu_handle_window_resize(&gpu_context) == GpuWindowState_Resized) {
         // ...
       }
