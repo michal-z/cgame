@@ -100,7 +100,8 @@ create_window(const char* name, int32_t width, int32_t height)
   return window;
 }
 
-typedef struct GameState {
+typedef struct GameState
+{
   const char *name;
   GpuContext *gpu_context;
 } GameState;
