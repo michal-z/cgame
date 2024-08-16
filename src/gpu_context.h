@@ -46,6 +46,12 @@ typedef struct GpuContext
   D3D12_CPU_DESCRIPTOR_HANDLE shader_dheap_start_cpu;
   D3D12_GPU_DESCRIPTOR_HANDLE shader_dheap_start_gpu;
   UINT shader_dheap_descriptor_size;
+
+  ID3D12Fence *frame_fence;
+  HANDLE frame_fence_event;
+  uint64_t frame_fence_counter;
+  uint32_t frame_index;
 } GpuContext;
 
 void gpu_init_context(GpuContext *gc, HWND window);
+void gpu_deinit_context(GpuContext *gc);

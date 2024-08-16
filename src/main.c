@@ -95,7 +95,7 @@ create_window(const char* name, int32_t width, int32_t height)
     NULL,
     NULL);
 
-  if (!window) VHR(HRESULT_FROM_WIN32(GetLastError()));
+  VHR(HRESULT_FROM_WIN32(GetLastError()));
 
   return window;
 }
@@ -125,6 +125,8 @@ main(void)
       Sleep(1);
     }
   }
+
+  gpu_deinit_context(&gpu_context);
 
   return 0;
 }
