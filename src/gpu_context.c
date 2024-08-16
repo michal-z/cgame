@@ -1,6 +1,10 @@
 #include "pch.h"
 #include "gpu_context.h"
 
+#define MAX_RTV_DESCRIPTORS 64
+#define MAX_DSV_DESCRIPTORS 64
+#define MAX_SHADER_DESCRIPTORS (32 * 1024)
+
 void
 gpu_init_context(GpuContext *gc, HWND window)
 {
@@ -243,7 +247,7 @@ gpu_init_context(GpuContext *gc, HWND window)
     gc->device,
     &(D3D12_DESCRIPTOR_HEAP_DESC){
       .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-      .NumDescriptors = 1024,
+      .NumDescriptors = MAX_RTV_DESCRIPTORS,
       .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
     },
     &IID_ID3D12DescriptorHeap,
@@ -267,5 +271,66 @@ gpu_init_context(GpuContext *gc, HWND window)
       });
   }
 
-  LOG("[gpu_context] Render target view (RTV) descriptor heap created");
+  LOG("[gpu_context] Render target view (RTV) descriptor heap created "
+    "(NumDescriptors: %d, DescriptorSize: %d)",
+    MAX_RTV_DESCRIPTORS,
+    gc->rtv_dheap_descriptor_size);
+
+  //
+  // DSV descriptor heap
+  //
+  VHR(ID3D12Device14_CreateDescriptorHeap(
+    gc->device,
+    &(D3D12_DESCRIPTOR_HEAP_DESC){
+      .Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+      .NumDescriptors = MAX_DSV_DESCRIPTORS,
+      .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+    },
+    &IID_ID3D12DescriptorHeap,
+    &gc->dsv_dheap));
+
+  ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(
+    gc->dsv_dheap,
+    &gc->dsv_dheap_start);
+
+  gc->dsv_dheap_descriptor_size = ID3D12Device14_GetDescriptorHandleIncrementSize(
+    gc->device,
+    D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
+  LOG(
+    "[gpu_context] Depth-stencil view (DSV) descriptor heap created "
+    "(NumDescriptors: %d, DescriptorSize: %d)",
+    MAX_DSV_DESCRIPTORS,
+    gc->dsv_dheap_descriptor_size);
+
+  //
+  // CBV, SRV, UAV descriptor heap
+  //
+  VHR(ID3D12Device14_CreateDescriptorHeap(
+    gc->device,
+    &(D3D12_DESCRIPTOR_HEAP_DESC){
+      .Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+      .NumDescriptors = MAX_SHADER_DESCRIPTORS,
+      .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+    },
+    &IID_ID3D12DescriptorHeap,
+    &gc->shader_dheap));
+
+  ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(
+    gc->shader_dheap,
+    &gc->shader_dheap_start_cpu);
+
+  ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(
+    gc->shader_dheap,
+    &gc->shader_dheap_start_gpu);
+
+  gc->shader_dheap_descriptor_size = 
+    ID3D12Device14_GetDescriptorHandleIncrementSize(
+      gc->device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+  LOG(
+    "[gpu_context] Shader view (CBV, SRV, UAV) descriptor heap created "
+    "(NumDescriptors: %d, DescriptorSize: %d)",
+    MAX_SHADER_DESCRIPTORS,
+    gc->shader_dheap_descriptor_size);
 }

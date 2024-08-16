@@ -38,6 +38,10 @@ typedef struct GpuContext
   D3D12_CPU_DESCRIPTOR_HANDLE rtv_dheap_start;
   UINT rtv_dheap_descriptor_size;
 
+  ID3D12DescriptorHeap *dsv_dheap;
+  D3D12_CPU_DESCRIPTOR_HANDLE dsv_dheap_start;
+  UINT dsv_dheap_descriptor_size;
+
   ID3D12DescriptorHeap *shader_dheap;
   D3D12_CPU_DESCRIPTOR_HANDLE shader_dheap_start_cpu;
   D3D12_GPU_DESCRIPTOR_HANDLE shader_dheap_start_gpu;
