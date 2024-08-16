@@ -119,14 +119,32 @@ game_init(GameState *game_state)
 }
 
 static void
+game_deinit(GameState *game_state)
+{
+  GpuContext *gc = game_state->gpu_context;
+
+  gpu_finish_commands(gc);
+  gpu_deinit_context(gc);
+  free(gc);
+}
+
+static bool
 game_update(GameState *game_state)
 {
   GpuContext *gc = game_state->gpu_context;
 
   update_frame_stats(gc->window, game_state->name);
-  if (gpu_handle_window_resize(gc) == GpuWindowState_Resized) {
+
+  GpuWindowState window_state = gpu_handle_window_resize(gc);
+
+  if (window_state == GpuWindowState_Minimized)
+    return false;
+
+  if (window_state == GpuWindowState_Resized) {
     // ...
   }
+
+  return true;
 }
 
 static void
@@ -135,16 +153,6 @@ game_draw(GameState *game_state)
   GpuContext *gc = game_state->gpu_context;
 
   gpu_present_frame(gc);
-}
-
-static void
-game_deinit(GameState *game_state)
-{
-  GpuContext *gc = game_state->gpu_context;
-
-  gpu_finish_commands(gc);
-  gpu_deinit_context(gc);
-  free(gc);
 }
 
 int
@@ -162,8 +170,7 @@ main(void)
       DispatchMessage(&msg);
       if (msg.message == WM_QUIT) break;
     } else {
-      game_update(&game_state);
-      game_draw(&game_state);
+      if (game_update(&game_state)) game_draw(&game_state);
     }
   }
 
