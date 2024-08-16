@@ -122,6 +122,9 @@ main(void)
       if (msg.message == WM_QUIT) break;
     } else {
       update_frame_stats(window, APP_NAME);
+      if (gpu_handle_window_resize(&gpu_context) == GpuWindowState_Resized) {
+        // ...
+      }
       gpu_present_frame(&gpu_context);
     }
   }

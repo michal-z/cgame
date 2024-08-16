@@ -271,7 +271,8 @@ gpu_init_context(GpuContext *gc, HWND window)
       });
   }
 
-  LOG("[gpu_context] Render target view (RTV) descriptor heap created "
+  LOG(
+    "[gpu_context] Render target view (RTV) descriptor heap created "
     "(NumDescriptors: %d, DescriptorSize: %d)",
     MAX_RTV_DESCRIPTORS,
     gc->rtv_dheap_descriptor_size);
@@ -435,4 +436,62 @@ gpu_present_frame(GpuContext *gc)
   }
 
   gc->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gc->swap_chain);
+}
+
+GpuWindowState
+gpu_handle_window_resize(GpuContext *gc)
+{
+  assert(gc && gc->device);
+
+  RECT current_rect = {0};
+  GetClientRect(gc->window, &current_rect);
+
+  if (current_rect.right == 0 && current_rect.bottom == 0) {
+    if (gc->viewport_width != 0 && gc->viewport_height != 0) {
+      gc->viewport_width = 0;
+      gc->viewport_height = 0;
+      LOG("[gpu_context] Window minimized.");
+    }
+    return GpuWindowState_Minimized;
+  }
+
+  if (current_rect.right != gc->viewport_width ||
+    current_rect.bottom != gc->viewport_height)
+  {
+    LOG(
+      "[gpu_context] Window resized to %ldx%ld",
+      current_rect.right,
+      current_rect.bottom);
+
+    gpu_finish_commands(gc);
+
+    for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
+      SAFE_RELEASE(gc->swap_chain_buffers[i]);
+
+    VHR(IDXGISwapChain4_ResizeBuffers(
+      gc->swap_chain, 0, 0, 0, DXGI_FORMAT_UNKNOWN, gc->swap_chain_flags));
+
+    for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
+      VHR(IDXGISwapChain4_GetBuffer(
+        gc->swap_chain, i, &IID_ID3D12Resource, &gc->swap_chain_buffers[i]));
+    }
+
+    for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
+      ID3D12Device14_CreateRenderTargetView(
+        gc->device,
+        gc->swap_chain_buffers[i],
+        NULL,
+        (D3D12_CPU_DESCRIPTOR_HANDLE){
+          .ptr = gc->rtv_dheap_start.ptr + i * gc->rtv_dheap_descriptor_size
+        });
+    }
+
+    gc->viewport_width = current_rect.right;
+    gc->viewport_height = current_rect.bottom;
+    gc->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gc->swap_chain);
+
+    return GpuWindowState_Resized;
+  }
+
+  return GpuWindowState_Unchanged;
 }

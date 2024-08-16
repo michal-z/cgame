@@ -53,7 +53,15 @@ typedef struct GpuContext
   uint32_t frame_index;
 } GpuContext;
 
+typedef enum GpuWindowState
+{
+  GpuWindowState_Unchanged,
+  GpuWindowState_Minimized,
+  GpuWindowState_Resized,
+} GpuWindowState;
+
 void gpu_init_context(GpuContext *gc, HWND window);
 void gpu_deinit_context(GpuContext *gc);
 void gpu_finish_commands(GpuContext *gc);
 void gpu_present_frame(GpuContext *gc);
+GpuWindowState gpu_handle_window_resize(GpuContext *gc);
