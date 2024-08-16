@@ -122,10 +122,11 @@ main(void)
       if (msg.message == WM_QUIT) break;
     } else {
       update_frame_stats(window, APP_NAME);
-      Sleep(1);
+      gpu_present_frame(&gpu_context);
     }
   }
 
+  gpu_finish_commands(&gpu_context);
   gpu_deinit_context(&gpu_context);
 
   return 0;

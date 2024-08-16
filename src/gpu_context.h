@@ -3,7 +3,7 @@
 #define GPU_MAX_BUFFERED_FRAMES 2
 #define GPU_ENABLE_DEBUG_LAYER 1
 #define GPU_ENABLE_GPU_BASED_VALIDATION 0
-#define GPU_ENABLE_VSYNC 1
+#define GPU_ENABLE_VSYNC 0
 #define GPU_SWAP_CHAIN_TARGET_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 #define GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 
@@ -55,3 +55,5 @@ typedef struct GpuContext
 
 void gpu_init_context(GpuContext *gc, HWND window);
 void gpu_deinit_context(GpuContext *gc);
+void gpu_finish_commands(GpuContext *gc);
+void gpu_present_frame(GpuContext *gc);

@@ -334,60 +334,105 @@ gpu_init_context(GpuContext *gc, HWND window)
     MAX_SHADER_DESCRIPTORS,
     gc->shader_dheap_descriptor_size);
 
-    //
-    // Frame fence
-    //
-    VHR(ID3D12Device14_CreateFence(
-      gc->device, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, &gc->frame_fence));
+  //
+  // Frame fence
+  //
+  VHR(ID3D12Device14_CreateFence(
+    gc->device, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, &gc->frame_fence));
 
-    gc->frame_fence_event = CreateEventEx(
-      NULL, "frame_fence_event", 0, EVENT_ALL_ACCESS);
-    VHR(HRESULT_FROM_WIN32(GetLastError()));
+  gc->frame_fence_event = CreateEventEx(
+    NULL, "frame_fence_event", 0, EVENT_ALL_ACCESS);
+  VHR(HRESULT_FROM_WIN32(GetLastError()));
 
-    gc->frame_fence_counter = 0;
-    gc->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gc->swap_chain);
+  gc->frame_fence_counter = 0;
+  gc->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gc->swap_chain);
 
-    LOG("[gpu_context] Frame fence created");
+  LOG("[gpu_context] Frame fence created");
 }
 
 void
 gpu_deinit_context(GpuContext *gc)
 {
-    assert(gc);
-
-    SAFE_RELEASE(gc->command_list);
-    for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
-      SAFE_RELEASE(gc->command_allocators[i]);
-    if (gc->frame_fence_event) {
-        CloseHandle(gc->frame_fence_event);
-        gc->frame_fence_event = NULL;
-    }
-    SAFE_RELEASE(gc->frame_fence);
-    SAFE_RELEASE(gc->shader_dheap);
-    SAFE_RELEASE(gc->rtv_dheap);
-    SAFE_RELEASE(gc->dsv_dheap);
-    for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
-      SAFE_RELEASE(gc->swap_chain_buffers[i]);
-    SAFE_RELEASE(gc->swap_chain);
-    SAFE_RELEASE(gc->command_queue);
-    SAFE_RELEASE(gc->device);
-    SAFE_RELEASE(gc->adapter);
-    SAFE_RELEASE(gc->dxgi_factory);
+  assert(gc);
+  SAFE_RELEASE(gc->command_list);
+  for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
+    SAFE_RELEASE(gc->command_allocators[i]);
+  if (gc->frame_fence_event) {
+    CloseHandle(gc->frame_fence_event);
+    gc->frame_fence_event = NULL;
+  }
+  SAFE_RELEASE(gc->frame_fence);
+  SAFE_RELEASE(gc->shader_dheap);
+  SAFE_RELEASE(gc->rtv_dheap);
+  SAFE_RELEASE(gc->dsv_dheap);
+  for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
+    SAFE_RELEASE(gc->swap_chain_buffers[i]);
+  SAFE_RELEASE(gc->swap_chain);
+  SAFE_RELEASE(gc->command_queue);
+  SAFE_RELEASE(gc->device);
+  SAFE_RELEASE(gc->adapter);
+  SAFE_RELEASE(gc->dxgi_factory);
 #if GPU_ENABLE_DEBUG_LAYER
-    SAFE_RELEASE(gc->debug_command_list);
-    SAFE_RELEASE(gc->debug_command_queue);
-    SAFE_RELEASE(gc->debug_info_queue);
-    SAFE_RELEASE(gc->debug);
+  SAFE_RELEASE(gc->debug_command_list);
+  SAFE_RELEASE(gc->debug_command_queue);
+  SAFE_RELEASE(gc->debug_info_queue);
+  SAFE_RELEASE(gc->debug);
 
-    if (gc->debug_device) {
-        VHR(ID3D12DebugDevice2_ReportLiveDeviceObjects(
-          gc->debug_device, D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL));
+  if (gc->debug_device) {
+    VHR(ID3D12DebugDevice2_ReportLiveDeviceObjects(
+      gc->debug_device, D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL));
 
-        ULONG refcount = ID3D12DebugDevice2_Release(gc->debug_device);
-        assert(refcount == 0);
-        (void)refcount;
+    ULONG refcount = ID3D12DebugDevice2_Release(gc->debug_device);
+    assert(refcount == 0);
+    (void)refcount;
 
-        gc->debug_device = NULL;
-    }
+    gc->debug_device = NULL;
+  }
 #endif
+}
+
+void
+gpu_finish_commands(GpuContext *gc)
+{
+  assert(gc && gc->device);
+  gc->frame_fence_counter += 1;
+
+  VHR(ID3D12CommandQueue_Signal(
+    gc->command_queue, gc->frame_fence, gc->frame_fence_counter));
+
+  VHR(ID3D12Fence_SetEventOnCompletion(
+    gc->frame_fence, gc->frame_fence_counter, gc->frame_fence_event));
+
+  WaitForSingleObject(gc->frame_fence_event, INFINITE);
+}
+
+void
+gpu_present_frame(GpuContext *gc)
+{
+  assert(gc && gc->device);
+  gc->frame_fence_counter += 1;
+
+  UINT present_flags = 0;
+
+  if (gc->swap_chain_present_interval == 0 &&
+    gc->swap_chain_flags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
+  {
+    present_flags |= DXGI_PRESENT_ALLOW_TEARING;
+  }
+
+  VHR(IDXGISwapChain4_Present(
+    gc->swap_chain, gc->swap_chain_present_interval, present_flags));
+
+  VHR(ID3D12CommandQueue_Signal(
+    gc->command_queue, gc->frame_fence, gc->frame_fence_counter));
+
+  uint64_t gpu_frame_counter = ID3D12Fence_GetCompletedValue(gc->frame_fence);
+  if ((gc->frame_fence_counter - gpu_frame_counter) >= GPU_MAX_BUFFERED_FRAMES) {
+    VHR(ID3D12Fence_SetEventOnCompletion(
+      gc->frame_fence, gpu_frame_counter + 1, gc->frame_fence_event));
+
+    WaitForSingleObject(gc->frame_fence_event, INFINITE);
+  }
+
+  gc->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gc->swap_chain);
 }
