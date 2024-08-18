@@ -81,19 +81,9 @@ create_window(const char* name, int32_t width, int32_t height)
   RECT rect = { 0, 0, width, height };
   AdjustWindowRectEx(&rect, style, FALSE, 0);
 
-  HWND window = CreateWindowEx(
-    0,
-    name,
-    name,
-    style | WS_VISIBLE,
-    CW_USEDEFAULT,
-    CW_USEDEFAULT,
-    rect.right - rect.left,
-    rect.bottom - rect.top,
-    NULL,
-    NULL,
-    NULL,
-    NULL);
+  HWND window = CreateWindowEx(0, name, name, style | WS_VISIBLE, CW_USEDEFAULT,
+    CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL,
+    NULL, NULL);
 
   VHR(HRESULT_FROM_WIN32(GetLastError()));
 

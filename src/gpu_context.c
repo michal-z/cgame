@@ -17,19 +17,14 @@ gpu_init_context(GpuContext *gc, HWND window)
   // Factory, adapater, device
   //
 #if GPU_ENABLE_DEBUG_LAYER
-  VHR(CreateDXGIFactory2(
-    DXGI_CREATE_FACTORY_DEBUG, &IID_IDXGIFactory7, &gc->dxgi_factory));
+  VHR(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, &IID_IDXGIFactory7,
+    &gc->dxgi_factory));
 #else
-  VHR(CreateDXGIFactory2(
-    0, &IID_IDXGIFactory7, &gc->dxgi_factory));
+  VHR(CreateDXGIFactory2(0, &IID_IDXGIFactory7, &gc->dxgi_factory));
 #endif
 
-  VHR(IDXGIFactory7_EnumAdapterByGpuPreference(
-    gc->dxgi_factory,
-    0,
-    DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-    &IID_IDXGIAdapter4,
-    &gc->adapter));
+  VHR(IDXGIFactory7_EnumAdapterByGpuPreference(gc->dxgi_factory, 0,
+    DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, &IID_IDXGIAdapter4, &gc->adapter));
 
   DXGI_ADAPTER_DESC3 adapter_desc = {0};
   VHR(IDXGIAdapter4_GetDesc3(gc->adapter, &adapter_desc));
@@ -49,31 +44,25 @@ gpu_init_context(GpuContext *gc, HWND window)
   LOG("[gpu_context] D3D12 GPU-Based Validation enabled");
 #endif
 #endif
-  if (FAILED(D3D12CreateDevice(
-    (IUnknown *)gc->adapter,
-    D3D_FEATURE_LEVEL_11_1,
-    &IID_ID3D12Device,
-    &gc->device)))
+  if (FAILED(D3D12CreateDevice((IUnknown *)gc->adapter, D3D_FEATURE_LEVEL_11_1,
+    &IID_ID3D12Device, &gc->device)))
   {
-    MessageBox(
-      window,
-      "Failed to create Direct3D 12 Device. This applications requires "
-      "graphics card with FEATURE LEVEL 11.1 support. Please update your "
-      "driver and try again.",
-      "DirectX 12 initialization error",
+    MessageBox(window, "Failed to create Direct3D 12 Device. This applications "
+      "requires graphics card with FEATURE LEVEL 11.1 support. Please update your "
+      "driver and try again.", "DirectX 12 initialization error",
       MB_OK | MB_ICONERROR);
     ExitProcess(1);
   }
 
 #if GPU_ENABLE_DEBUG_LAYER
-  VHR(ID3D12Device14_QueryInterface(
-    gc->device, &IID_ID3D12DebugDevice2, &gc->debug_device));
+  VHR(ID3D12Device14_QueryInterface(gc->device, &IID_ID3D12DebugDevice2,
+    &gc->debug_device));
 
-  VHR(ID3D12Device14_QueryInterface(
-    gc->device, &IID_ID3D12InfoQueue1, &gc->debug_info_queue));
+  VHR(ID3D12Device14_QueryInterface(gc->device, &IID_ID3D12InfoQueue1,
+    &gc->debug_info_queue));
 
-  VHR(ID3D12InfoQueue1_SetBreakOnSeverity(
-    gc->debug_info_queue, D3D12_MESSAGE_SEVERITY_ERROR, TRUE));
+  VHR(ID3D12InfoQueue1_SetBreakOnSeverity(gc->debug_info_queue,
+    D3D12_MESSAGE_SEVERITY_ERROR, TRUE));
 #endif
   LOG("[gpu_context] D3D12 device created");
 
@@ -82,24 +71,18 @@ gpu_init_context(GpuContext *gc, HWND window)
   //
   {
     D3D12_FEATURE_DATA_D3D12_OPTIONS options = {0};
-    VHR(ID3D12Device14_CheckFeatureSupport(
-      gc->device, D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options)));
+    VHR(ID3D12Device14_CheckFeatureSupport(gc->device,
+      D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options)));
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS12 options12 = {0};
-    VHR(ID3D12Device14_CheckFeatureSupport(
-      gc->device,
-      D3D12_FEATURE_D3D12_OPTIONS12,
-      &options12,
-      sizeof(options12)));
+    VHR(ID3D12Device14_CheckFeatureSupport(gc->device,
+      D3D12_FEATURE_D3D12_OPTIONS12, &options12, sizeof(options12)));
 
     D3D12_FEATURE_DATA_SHADER_MODEL shader_model = {
       .HighestShaderModel = D3D_HIGHEST_SHADER_MODEL
     };
-    VHR(ID3D12Device14_CheckFeatureSupport(
-      gc->device,
-      D3D12_FEATURE_SHADER_MODEL,
-      &shader_model,
-      sizeof(shader_model)));
+    VHR(ID3D12Device14_CheckFeatureSupport(gc->device, D3D12_FEATURE_SHADER_MODEL,
+      &shader_model, sizeof(shader_model)));
 
     bool is_supported = true;
     if (options.ResourceBindingTier < D3D12_RESOURCE_BINDING_TIER_3) {
@@ -121,12 +104,9 @@ gpu_init_context(GpuContext *gc, HWND window)
     } else LOG("[gpu_context] Shader Model 6.6 is SUPPORTED");
 
     if (!is_supported) {
-      MessageBox(
-        window,
-        "Your graphics card does not support some required features. "
-        "Please update your graphics driver and try again.",
-        "DirectX 12 initialization error",
-        MB_OK | MB_ICONERROR);
+      MessageBox(window, "Your graphics card does not support some required "
+        "features. Please update your graphics driver and try again.",
+        "DirectX 12 initialization error", MB_OK | MB_ICONERROR);
       ExitProcess(1);
     }
   }
@@ -134,45 +114,35 @@ gpu_init_context(GpuContext *gc, HWND window)
   //
   // Commands
   //
-  VHR(ID3D12Device14_CreateCommandQueue(
-    gc->device,
+  VHR(ID3D12Device14_CreateCommandQueue(gc->device,
     &(D3D12_COMMAND_QUEUE_DESC){
       .Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
       .Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
       .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
     },
-    &IID_ID3D12CommandQueue,
-    &gc->command_queue));
+    &IID_ID3D12CommandQueue, &gc->command_queue));
 
 #if GPU_ENABLE_DEBUG_LAYER
-  VHR(ID3D12CommandQueue_QueryInterface(
-    gc->command_queue,
-    &IID_ID3D12DebugCommandQueue1,
-    &gc->debug_command_queue));
+  VHR(ID3D12CommandQueue_QueryInterface(gc->command_queue,
+    &IID_ID3D12DebugCommandQueue1, &gc->debug_command_queue));
 #endif
   LOG("[gpu_context] Command queue created");
 
   for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-    VHR(ID3D12Device14_CreateCommandAllocator(
-      gc->device,
-      D3D12_COMMAND_LIST_TYPE_DIRECT,
-      &IID_ID3D12CommandAllocator,
+    VHR(ID3D12Device14_CreateCommandAllocator(gc->device,
+      D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator,
       &gc->command_allocators[i]));
   }
 
   LOG("[gpu_context] Command allocators created");
 
-  VHR(ID3D12Device14_CreateCommandList1(
-    gc->device,
-    0,
-    D3D12_COMMAND_LIST_TYPE_DIRECT,
-    D3D12_COMMAND_LIST_FLAG_NONE,
-    &IID_ID3D12GraphicsCommandList10,
-    &gc->command_list));
+  VHR(ID3D12Device14_CreateCommandList1(gc->device, 0,
+    D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_FLAG_NONE,
+    &IID_ID3D12GraphicsCommandList10, &gc->command_list));
 
 #if GPU_ENABLE_DEBUG_LAYER
-  VHR(ID3D12GraphicsCommandList10_QueryInterface(
-    gc->command_list, &IID_ID3D12DebugCommandList3, &gc->debug_command_list));
+  VHR(ID3D12GraphicsCommandList10_QueryInterface(gc->command_list,
+    &IID_ID3D12DebugCommandList3, &gc->debug_command_list));
 #endif
   LOG("[gpu_context] Command list created");
 
@@ -184,11 +154,8 @@ gpu_init_context(GpuContext *gc, HWND window)
     gc->swap_chain_present_interval = GPU_ENABLE_VSYNC;
 
     BOOL allow_tearing = FALSE;
-    const HRESULT hr = IDXGIFactory7_CheckFeatureSupport(
-      gc->dxgi_factory,
-      DXGI_FEATURE_PRESENT_ALLOW_TEARING,
-      &allow_tearing,
-      sizeof(allow_tearing));
+    const HRESULT hr = IDXGIFactory7_CheckFeatureSupport(gc->dxgi_factory,
+      DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allow_tearing, sizeof(allow_tearing));
 
     if (SUCCEEDED(hr) && allow_tearing == TRUE) {
       gc->swap_chain_flags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
@@ -201,10 +168,8 @@ gpu_init_context(GpuContext *gc, HWND window)
   }
 
   IDXGISwapChain1 *swap_chain1 = NULL;
-  VHR(IDXGIFactory7_CreateSwapChainForHwnd(
-    gc->dxgi_factory,
-    (IUnknown *)gc->command_queue,
-    window,
+  VHR(IDXGIFactory7_CreateSwapChainForHwnd(gc->dxgi_factory,
+    (IUnknown *)gc->command_queue, window,
     &(DXGI_SWAP_CHAIN_DESC1){
       .Width = gc->viewport_width,
       .Height = gc->viewport_height,
@@ -218,20 +183,18 @@ gpu_init_context(GpuContext *gc, HWND window)
       .AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED,
       .Flags = gc->swap_chain_flags,
     },
-    NULL,
-    NULL,
-    &swap_chain1));
+    NULL, NULL, &swap_chain1));
 
-  VHR(IDXGISwapChain1_QueryInterface(
-    swap_chain1, &IID_IDXGISwapChain4, &gc->swap_chain));
+  VHR(IDXGISwapChain1_QueryInterface(swap_chain1, &IID_IDXGISwapChain4,
+    &gc->swap_chain));
   SAFE_RELEASE(swap_chain1);
 
-  VHR(IDXGIFactory7_MakeWindowAssociation(
-    gc->dxgi_factory, window, DXGI_MWA_NO_WINDOW_CHANGES));
+  VHR(IDXGIFactory7_MakeWindowAssociation(gc->dxgi_factory, window,
+    DXGI_MWA_NO_WINDOW_CHANGES));
 
   for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-    VHR(IDXGISwapChain4_GetBuffer(
-      gc->swap_chain, i, &IID_ID3D12Resource, &gc->swap_chain_buffers[i]));
+    VHR(IDXGISwapChain4_GetBuffer(gc->swap_chain, i, &IID_ID3D12Resource,
+      &gc->swap_chain_buffers[i]));
   }
 
   LOG("[gpu_context] Swap chain created");
@@ -239,28 +202,22 @@ gpu_init_context(GpuContext *gc, HWND window)
   //
   // RTV descriptor heap
   //
-  VHR(ID3D12Device14_CreateDescriptorHeap(
-    gc->device,
+  VHR(ID3D12Device14_CreateDescriptorHeap(gc->device,
     &(D3D12_DESCRIPTOR_HEAP_DESC){
       .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
       .NumDescriptors = GPU_MAX_RTV_DESCRIPTORS,
       .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
     },
-    &IID_ID3D12DescriptorHeap,
-    &gc->rtv_dheap));
+    &IID_ID3D12DescriptorHeap, &gc->rtv_dheap));
 
-  ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(
-    gc->rtv_dheap,
+  ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(gc->rtv_dheap,
     &gc->rtv_dheap_start);
 
   gc->rtv_dheap_descriptor_size = ID3D12Device14_GetDescriptorHandleIncrementSize(
-    gc->device,
-    D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    gc->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
   for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-    ID3D12Device14_CreateRenderTargetView(
-      gc->device,
-      gc->swap_chain_buffers[i],
+    ID3D12Device14_CreateRenderTargetView(gc->device, gc->swap_chain_buffers[i],
       &(D3D12_RENDER_TARGET_VIEW_DESC){
         .Format = GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT,
         .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
@@ -270,78 +227,64 @@ gpu_init_context(GpuContext *gc, HWND window)
       });
   }
 
-  LOG(
-    "[gpu_context] Render target view (RTV) descriptor heap created "
-    "(NumDescriptors: %d, DescriptorSize: %d)",
-    GPU_MAX_RTV_DESCRIPTORS,
+  LOG("[gpu_context] Render target view (RTV) descriptor heap created "
+    "(NumDescriptors: %d, DescriptorSize: %d)", GPU_MAX_RTV_DESCRIPTORS,
     gc->rtv_dheap_descriptor_size);
 
   //
   // DSV descriptor heap
   //
-  VHR(ID3D12Device14_CreateDescriptorHeap(
-    gc->device,
+  VHR(ID3D12Device14_CreateDescriptorHeap(gc->device,
     &(D3D12_DESCRIPTOR_HEAP_DESC){
       .Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
       .NumDescriptors = GPU_MAX_DSV_DESCRIPTORS,
       .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
     },
-    &IID_ID3D12DescriptorHeap,
-    &gc->dsv_dheap));
+    &IID_ID3D12DescriptorHeap, &gc->dsv_dheap));
 
-  ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(
-    gc->dsv_dheap,
+  ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(gc->dsv_dheap,
     &gc->dsv_dheap_start);
 
   gc->dsv_dheap_descriptor_size = ID3D12Device14_GetDescriptorHandleIncrementSize(
-    gc->device,
-    D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+    gc->device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
-  LOG(
-    "[gpu_context] Depth-stencil view (DSV) descriptor heap created "
+  LOG("[gpu_context] Depth-stencil view (DSV) descriptor heap created "
     "(NumDescriptors: %d, DescriptorSize: %d)",
-    GPU_MAX_DSV_DESCRIPTORS,
-    gc->dsv_dheap_descriptor_size);
+    GPU_MAX_DSV_DESCRIPTORS, gc->dsv_dheap_descriptor_size);
 
   //
   // CBV, SRV, UAV descriptor heap
   //
-  VHR(ID3D12Device14_CreateDescriptorHeap(
-    gc->device,
+  VHR(ID3D12Device14_CreateDescriptorHeap(gc->device,
     &(D3D12_DESCRIPTOR_HEAP_DESC){
       .Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
       .NumDescriptors = GPU_MAX_SHADER_DESCRIPTORS,
       .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
     },
-    &IID_ID3D12DescriptorHeap,
-    &gc->shader_dheap));
+    &IID_ID3D12DescriptorHeap, &gc->shader_dheap));
 
-  ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(
-    gc->shader_dheap,
+  ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(gc->shader_dheap,
     &gc->shader_dheap_start_cpu);
 
-  ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(
-    gc->shader_dheap,
+  ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(gc->shader_dheap,
     &gc->shader_dheap_start_gpu);
 
   gc->shader_dheap_descriptor_size = 
-    ID3D12Device14_GetDescriptorHandleIncrementSize(
-      gc->device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    ID3D12Device14_GetDescriptorHandleIncrementSize(gc->device,
+      D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-  LOG(
-    "[gpu_context] Shader view (CBV, SRV, UAV) descriptor heap created "
-    "(NumDescriptors: %d, DescriptorSize: %d)",
-    GPU_MAX_SHADER_DESCRIPTORS,
+  LOG("[gpu_context] Shader view (CBV, SRV, UAV) descriptor heap created "
+    "(NumDescriptors: %d, DescriptorSize: %d)", GPU_MAX_SHADER_DESCRIPTORS,
     gc->shader_dheap_descriptor_size);
 
   //
   // Frame fence
   //
-  VHR(ID3D12Device14_CreateFence(
-    gc->device, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, &gc->frame_fence));
+  VHR(ID3D12Device14_CreateFence(gc->device, 0, D3D12_FENCE_FLAG_NONE,
+    &IID_ID3D12Fence, &gc->frame_fence));
 
-  gc->frame_fence_event = CreateEventEx(
-    NULL, "frame_fence_event", 0, EVENT_ALL_ACCESS);
+  gc->frame_fence_event = CreateEventEx(NULL, "frame_fence_event", 0,
+    EVENT_ALL_ACCESS);
   VHR(HRESULT_FROM_WIN32(GetLastError()));
 
   gc->frame_fence_counter = 0;
@@ -379,8 +322,8 @@ gpu_deinit_context(GpuContext *gc)
   SAFE_RELEASE(gc->debug);
 
   if (gc->debug_device) {
-    VHR(ID3D12DebugDevice2_ReportLiveDeviceObjects(
-      gc->debug_device, D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL));
+    VHR(ID3D12DebugDevice2_ReportLiveDeviceObjects(gc->debug_device,
+      D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL));
 
     ULONG refcount = ID3D12DebugDevice2_Release(gc->debug_device);
     assert(refcount == 0);
@@ -397,11 +340,11 @@ gpu_finish_commands(GpuContext *gc)
   assert(gc && gc->device);
   gc->frame_fence_counter += 1;
 
-  VHR(ID3D12CommandQueue_Signal(
-    gc->command_queue, gc->frame_fence, gc->frame_fence_counter));
+  VHR(ID3D12CommandQueue_Signal(gc->command_queue, gc->frame_fence,
+    gc->frame_fence_counter));
 
-  VHR(ID3D12Fence_SetEventOnCompletion(
-    gc->frame_fence, gc->frame_fence_counter, gc->frame_fence_event));
+  VHR(ID3D12Fence_SetEventOnCompletion(gc->frame_fence, gc->frame_fence_counter,
+    gc->frame_fence_event));
 
   WaitForSingleObject(gc->frame_fence_event, INFINITE);
 }
@@ -420,16 +363,16 @@ gpu_present_frame(GpuContext *gc)
     present_flags |= DXGI_PRESENT_ALLOW_TEARING;
   }
 
-  VHR(IDXGISwapChain4_Present(
-    gc->swap_chain, gc->swap_chain_present_interval, present_flags));
+  VHR(IDXGISwapChain4_Present(gc->swap_chain, gc->swap_chain_present_interval,
+    present_flags));
 
-  VHR(ID3D12CommandQueue_Signal(
-    gc->command_queue, gc->frame_fence, gc->frame_fence_counter));
+  VHR(ID3D12CommandQueue_Signal(gc->command_queue, gc->frame_fence,
+    gc->frame_fence_counter));
 
   uint64_t gpu_frame_counter = ID3D12Fence_GetCompletedValue(gc->frame_fence);
   if ((gc->frame_fence_counter - gpu_frame_counter) >= GPU_MAX_BUFFERED_FRAMES) {
-    VHR(ID3D12Fence_SetEventOnCompletion(
-      gc->frame_fence, gpu_frame_counter + 1, gc->frame_fence_event));
+    VHR(ID3D12Fence_SetEventOnCompletion(gc->frame_fence, gpu_frame_counter + 1,
+      gc->frame_fence_event));
 
     WaitForSingleObject(gc->frame_fence_event, INFINITE);
   }
@@ -457,9 +400,7 @@ gpu_handle_window_resize(GpuContext *gc)
   if (current_rect.right != gc->viewport_width ||
     current_rect.bottom != gc->viewport_height)
   {
-    LOG(
-      "[gpu_context] Window resized to %ldx%ld",
-      current_rect.right,
+    LOG("[gpu_context] Window resized to %ldx%ld", current_rect.right,
       current_rect.bottom);
 
     gpu_finish_commands(gc);
@@ -467,18 +408,16 @@ gpu_handle_window_resize(GpuContext *gc)
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
       SAFE_RELEASE(gc->swap_chain_buffers[i]);
 
-    VHR(IDXGISwapChain4_ResizeBuffers(
-      gc->swap_chain, 0, 0, 0, DXGI_FORMAT_UNKNOWN, gc->swap_chain_flags));
+    VHR(IDXGISwapChain4_ResizeBuffers(gc->swap_chain, 0, 0, 0, DXGI_FORMAT_UNKNOWN,
+      gc->swap_chain_flags));
 
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-      VHR(IDXGISwapChain4_GetBuffer(
-        gc->swap_chain, i, &IID_ID3D12Resource, &gc->swap_chain_buffers[i]));
+      VHR(IDXGISwapChain4_GetBuffer(gc->swap_chain, i, &IID_ID3D12Resource,
+        &gc->swap_chain_buffers[i]));
     }
 
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-      ID3D12Device14_CreateRenderTargetView(
-        gc->device,
-        gc->swap_chain_buffers[i],
+      ID3D12Device14_CreateRenderTargetView(gc->device, gc->swap_chain_buffers[i],
         &(D3D12_RENDER_TARGET_VIEW_DESC){
           .Format = GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT,
           .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
