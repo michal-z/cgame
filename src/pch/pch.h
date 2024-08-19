@@ -53,3 +53,23 @@
 #undef ID3D12Device14_CreateRenderTargetView
 #define ID3D12Device14_CreateRenderTargetView(This,...)	\
   ( (This)->lpVtbl -> CreateRenderTargetView(This,__VA_ARGS__) )
+
+#undef ID3D12GraphicsCommandList10_RSSetViewports
+#define ID3D12GraphicsCommandList10_RSSetViewports(This,...)	\
+  ( (This)->lpVtbl -> RSSetViewports(This,__VA_ARGS__) )
+
+#undef ID3D12GraphicsCommandList10_RSSetScissorRects
+#define ID3D12GraphicsCommandList10_RSSetScissorRects(This,...)	\
+  ( (This)->lpVtbl -> RSSetScissorRects(This,__VA_ARGS__) )
+
+#undef ID3D12GraphicsCommandList10_OMSetRenderTargets
+#define ID3D12GraphicsCommandList10_OMSetRenderTargets(This,...)	\
+  ( (This)->lpVtbl -> OMSetRenderTargets(This,__VA_ARGS__) )
+
+#undef ID3D12GraphicsCommandList10_ClearRenderTargetView
+#define ID3D12GraphicsCommandList10_ClearRenderTargetView(This,...)	\
+  ( (This)->lpVtbl -> ClearRenderTargetView(This,__VA_ARGS__) )
+
+#undef ID3D12GraphicsCommandList10_Barrier
+#define ID3D12GraphicsCommandList10_Barrier(This,...)	\
+  ( (This)->lpVtbl -> Barrier(This,__VA_ARGS__) )

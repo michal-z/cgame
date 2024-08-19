@@ -142,6 +142,77 @@ static void
 game_draw(GameState *game_state)
 {
   GpuContext *gc = game_state->gpu_context;
+  ID3D12CommandAllocator *cmdalloc = gc->command_allocators[gc->frame_index];
+  ID3D12GraphicsCommandList10 *cmdlist = gc->command_list;
+
+  VHR(ID3D12CommandAllocator_Reset(cmdalloc));
+  VHR(ID3D12GraphicsCommandList10_Reset(cmdlist, cmdalloc, NULL));
+
+  ID3D12GraphicsCommandList10_SetDescriptorHeaps(cmdlist, 1, &gc->shader_dheap);
+
+  ID3D12GraphicsCommandList10_RSSetViewports(cmdlist, 1,
+    &(D3D12_VIEWPORT){
+      .TopLeftX = 0.0f,
+      .TopLeftY = 0.0f,
+      .Width = (float)gc->viewport_width,
+      .Height = (float)gc->viewport_height,
+      .MinDepth = 0.0f,
+      .MaxDepth = 1.0f,
+    });
+
+  ID3D12GraphicsCommandList10_RSSetScissorRects(cmdlist, 1,
+    &(D3D12_RECT){
+      .left = 0,
+      .top = 0,
+      .right = gc->viewport_width,
+      .bottom = gc->viewport_height,
+    });
+
+  D3D12_CPU_DESCRIPTOR_HANDLE rt_descriptor = {
+    .ptr = gc->rtv_dheap_start.ptr + gc->frame_index *
+      gc->rtv_dheap_descriptor_size
+  };
+
+  ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+    &(D3D12_BARRIER_GROUP){
+      .Type = D3D12_BARRIER_TYPE_TEXTURE,
+      .NumBarriers = 1,
+      .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+        .SyncBefore = D3D12_BARRIER_SYNC_NONE,
+        .SyncAfter = D3D12_BARRIER_SYNC_RENDER_TARGET,
+        .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
+        .AccessAfter = D3D12_BARRIER_ACCESS_RENDER_TARGET,
+        .LayoutBefore = D3D12_BARRIER_LAYOUT_PRESENT,
+        .LayoutAfter = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        .pResource = gc->swap_chain_buffers[gc->frame_index],
+      },
+    });
+
+  ID3D12GraphicsCommandList10_OMSetRenderTargets(cmdlist, 1, &rt_descriptor,
+    TRUE, NULL);
+
+  ID3D12GraphicsCommandList10_ClearRenderTargetView(cmdlist, rt_descriptor,
+    (float[4]){ 0.2f, 0.4f, 0.8f, 1.0f }, 0, NULL);
+
+  ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+    &(D3D12_BARRIER_GROUP){
+      .Type = D3D12_BARRIER_TYPE_TEXTURE,
+      .NumBarriers = 1,
+      .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+        .SyncBefore = D3D12_BARRIER_SYNC_RENDER_TARGET,
+        .SyncAfter = D3D12_BARRIER_SYNC_NONE,
+        .AccessBefore = D3D12_BARRIER_ACCESS_RENDER_TARGET,
+        .AccessAfter = D3D12_BARRIER_ACCESS_NO_ACCESS,
+        .LayoutBefore = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        .LayoutAfter = D3D12_BARRIER_LAYOUT_PRESENT,
+        .pResource = gc->swap_chain_buffers[gc->frame_index],
+      },
+    });
+
+  VHR(ID3D12GraphicsCommandList10_Close(cmdlist));
+
+  ID3D12CommandQueue_ExecuteCommandLists(gc->command_queue, 1,
+    (ID3D12CommandList **)&cmdlist);
 
   gpu_present_frame(gc);
 }
