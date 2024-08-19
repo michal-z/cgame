@@ -405,6 +405,7 @@ gpu_finish_commands(GpuContext *gc)
     gc->frame_fence_event));
 
   WaitForSingleObject(gc->frame_fence_event, INFINITE);
+  gc->upload_heaps[gc->frame_index].size = 0;
 }
 
 void
@@ -436,6 +437,7 @@ gpu_present_frame(GpuContext *gc)
   }
 
   gc->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gc->swap_chain);
+  gc->upload_heaps[gc->frame_index].size = 0;
 }
 
 GpuWindowState
@@ -493,4 +495,28 @@ gpu_handle_window_resize(GpuContext *gc)
   }
 
   return GpuWindowState_Unchanged;
+}
+
+GpuUploadBufferRegion
+gpu_alloc_upload_memory(GpuContext *gc, uint32_t size)
+{
+  assert(gc && gc->device && size > 0);
+
+  void *ptr = umh_alloc(&gc->upload_heaps[gc->frame_index], size);
+  if (ptr == NULL) {
+    LOG("[gpu_context] Upload memory exhausted - waiting for the GPU... "
+      "(command list state is lost!).");
+    gpu_finish_commands(gc);
+    ptr = umh_alloc(&gc->upload_heaps[gc->frame_index], size);
+    assert(ptr);
+  }
+
+  uint32_t asize = (size + (UMH_ALLOC_ALIGNMENT - 1)) &
+    ~(UMH_ALLOC_ALIGNMENT - 1);
+
+  return (GpuUploadBufferRegion){
+    .ptr = ptr,
+    .buffer = gc->upload_heaps[gc->frame_index].buffer,
+    .buffer_offset = gc->upload_heaps[gc->frame_index].size - asize,
+  };
 }
