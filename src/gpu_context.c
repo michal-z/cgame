@@ -466,8 +466,8 @@ gpu_handle_window_resize(GpuContext *gc)
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
       SAFE_RELEASE(gc->swap_chain_buffers[i]);
 
-    VHR(IDXGISwapChain4_ResizeBuffers(gc->swap_chain, 0, 0, 0, DXGI_FORMAT_UNKNOWN,
-      gc->swap_chain_flags));
+    VHR(IDXGISwapChain4_ResizeBuffers(gc->swap_chain, 0, 0, 0,
+      DXGI_FORMAT_UNKNOWN, gc->swap_chain_flags));
 
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
       VHR(IDXGISwapChain4_GetBuffer(gc->swap_chain, i, &IID_ID3D12Resource,
