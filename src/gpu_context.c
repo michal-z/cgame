@@ -1,6 +1,54 @@
 #include "pch.h"
 #include "gpu_context.h"
 
+#define UMH_ALLOC_ALIGNMENT 512
+
+static void
+umh_init(GpuUploadMemoryHeap *umh, ID3D12Device14 *device, uint32_t capacity)
+{
+  assert(umh && !umh->buffer && capacity > 0);
+
+  umh->size = 0;
+  umh->capacity = capacity;
+
+  VHR(ID3D12Device14_CreateCommittedResource3(device,
+    &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_UPLOAD },
+    D3D12_HEAP_FLAG_NONE,
+    &(D3D12_RESOURCE_DESC1){
+      .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+      .Width = umh->capacity,
+      .Height = 1,
+      .DepthOrArraySize = 1,
+      .MipLevels = 1,
+      .SampleDesc = { .Count = 1 },
+      .Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+    },
+    D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, NULL, 0, NULL, &IID_ID3D12Resource,
+    &umh->buffer));
+
+  VHR(ID3D12Resource_Map(umh->buffer, 0, &(D3D12_RANGE){ .Begin = 0, .End = 0 },
+    &umh->ptr));
+}
+
+static void
+umh_deinit(GpuUploadMemoryHeap *umh)
+{
+  SAFE_RELEASE(umh->buffer);
+  umh->size = umh->capacity = 0;
+  umh->ptr = NULL;
+}
+
+static void *
+umh_alloc(GpuUploadMemoryHeap *umh, uint32_t size)
+{
+  assert(umh && umh->buffer && size > 0);
+  uint32_t asize = (size + (UMH_ALLOC_ALIGNMENT - 1)) & ~(UMH_ALLOC_ALIGNMENT- 1);
+  if ((umh->size + asize) >= umh->capacity) return NULL;
+  uint8_t *ptr = umh->ptr + umh->size;
+  umh->size += asize;
+  return ptr;
+}
+
 void
 gpu_init_context(GpuContext *gc, HWND window)
 {
@@ -291,6 +339,14 @@ gpu_init_context(GpuContext *gc, HWND window)
   gc->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gc->swap_chain);
 
   LOG("[gpu_context] Frame fence created");
+
+  //
+  // Upload heaps
+  //
+  for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
+    umh_init(&gc->upload_heaps[i], gc->device, GPU_UPLOAD_HEAP_CAPACITY);
+  }
+  LOG("[gpu_context] Upload heaps created");
 }
 
 void
@@ -298,8 +354,10 @@ gpu_deinit_context(GpuContext *gc)
 {
   assert(gc);
   SAFE_RELEASE(gc->command_list);
-  for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
+  for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
     SAFE_RELEASE(gc->command_allocators[i]);
+    umh_deinit(&gc->upload_heaps[i]);
+  }
   if (gc->frame_fence_event) {
     CloseHandle(gc->frame_fence_event);
     gc->frame_fence_event = NULL;

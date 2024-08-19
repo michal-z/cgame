@@ -14,6 +14,16 @@
 #define GPU_MAX_DSV_DESCRIPTORS 64
 #define GPU_MAX_SHADER_DESCRIPTORS (32 * 1024)
 
+#define GPU_UPLOAD_HEAP_CAPACITY (64 * 1024 * 1024)
+
+typedef struct GpuUploadMemoryHeap
+{
+    ID3D12Resource *buffer;
+    uint8_t *ptr;
+    uint32_t size;
+    uint32_t capacity;
+} GpuUploadMemoryHeap;
+
 typedef struct GpuContext
 {
   HWND window;
@@ -58,6 +68,8 @@ typedef struct GpuContext
   HANDLE frame_fence_event;
   uint64_t frame_fence_counter;
   uint32_t frame_index;
+
+  GpuUploadMemoryHeap upload_heaps[GPU_MAX_BUFFERED_FRAMES];
 } GpuContext;
 
 typedef enum GpuWindowState

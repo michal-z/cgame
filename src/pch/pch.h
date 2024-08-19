@@ -46,11 +46,19 @@ void mem_free(void *ptr, const char *file, int32_t line);
 
 #undef ID3D12Device14_CreateCommandQueue
 #define ID3D12Device14_CreateCommandQueue(This,...)	\
-  ( (This)->lpVtbl -> CreateCommandQueue(This,__VA_ARGS__) ) 
+  ( (This)->lpVtbl -> CreateCommandQueue(This,__VA_ARGS__) )
+
+#undef ID3D12Device14_CreateCommittedResource3
+#define ID3D12Device14_CreateCommittedResource3(This,...)	\
+  ( (This)->lpVtbl -> CreateCommittedResource3(This,__VA_ARGS__) )
+
+#undef ID3D12Resource_Map
+#define ID3D12Resource_Map(This,...)	\
+  ( (This)->lpVtbl -> Map(This,__VA_ARGS__) )
 
 #undef IDXGIFactory7_CreateSwapChainForHwnd
 #define IDXGIFactory7_CreateSwapChainForHwnd(This,...)	\
-  ( (This)->lpVtbl -> CreateSwapChainForHwnd(This,__VA_ARGS__) ) 
+  ( (This)->lpVtbl -> CreateSwapChainForHwnd(This,__VA_ARGS__) )
 
 #undef ID3D12Device14_CreateDescriptorHeap
 #define ID3D12Device14_CreateDescriptorHeap(This,...)	\
