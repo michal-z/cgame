@@ -202,7 +202,7 @@ gpu_init_context(GpuContext *gc, HWND window)
     gc->swap_chain_present_interval = GPU_ENABLE_VSYNC;
 
     BOOL allow_tearing = FALSE;
-    const HRESULT hr = IDXGIFactory7_CheckFeatureSupport(gc->dxgi_factory,
+    HRESULT hr = IDXGIFactory7_CheckFeatureSupport(gc->dxgi_factory,
       DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allow_tearing, sizeof(allow_tearing));
 
     if (SUCCEEDED(hr) && allow_tearing == TRUE) {
