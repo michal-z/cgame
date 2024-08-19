@@ -38,6 +38,12 @@
   } \
 } while(0)
 
+#define M_ALLOC(size) mem_alloc((size), __FILE__, __LINE__)
+#define M_FREE(ptr) mem_free((ptr), __FILE__, __LINE__)
+
+void *mem_alloc(size_t size, const char *file, int32_t line);
+void mem_free(void *ptr, const char *file, int32_t line);
+
 #undef ID3D12Device14_CreateCommandQueue
 #define ID3D12Device14_CreateCommandQueue(This,...)	\
   ( (This)->lpVtbl -> CreateCommandQueue(This,__VA_ARGS__) ) 

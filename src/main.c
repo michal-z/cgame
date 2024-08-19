@@ -66,7 +66,7 @@ update_frame_stats(HWND window, const char *name)
 }
 
 static HWND
-create_window(const char* name, int32_t width, int32_t height)
+create_window(const char *name, int32_t width, int32_t height)
 {
   RegisterClass(
     &(WNDCLASSA){
@@ -103,7 +103,7 @@ game_init(GameState *game_state)
 
   HWND window = create_window(game_state->name, 1600, 1200);
 
-  game_state->gpu_context = malloc(sizeof(GpuContext));
+  game_state->gpu_context = M_ALLOC(sizeof(GpuContext));
   memset(game_state->gpu_context, 0, sizeof(GpuContext));
 
   gpu_init_context(game_state->gpu_context, window);
@@ -116,7 +116,7 @@ game_deinit(GameState *game_state)
 
   gpu_finish_commands(gc);
   gpu_deinit_context(gc);
-  free(gc);
+  M_FREE(gc);
 }
 
 static bool
