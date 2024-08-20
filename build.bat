@@ -3,7 +3,7 @@ SETLOCAL enableextensions enabledelayedexpansion
 
 SET NAME="cgame"
 
-SET CONFIG=R
+SET CONFIG=D
 SET C_FLAGS=/MP /std:c17 /experimental:c11atomics /GR- /nologo /Gm- /WX /Wall ^
 /wd4191 /wd4820 /wd4255 /wd5045 /wd4505 /I"src" /I"src\pch" /I"src\deps" ^
 /wd4710 /wd4711 /I"src\deps\d3d12"

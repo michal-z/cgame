@@ -93,10 +93,14 @@ create_window(const char *name, int32_t width, int32_t height)
   return window;
 }
 
+#define PSO_MAX 16
+
 typedef struct GameState
 {
   const char *name;
   GpuContext *gpu_context;
+  ID3D12RootSignature *pso_rs;
+  ID3D12PipelineState *pso[PSO_MAX];
 } GameState;
 
 static void
@@ -110,6 +114,33 @@ game_init(GameState *game_state)
   memset(game_state->gpu_context, 0, sizeof(GpuContext));
 
   gpu_init_context(game_state->gpu_context, window);
+
+  GpuContext *gc = game_state->gpu_context;
+
+  VHR(ID3D12Device14_CreateRootSignature(gc->device, 0, g_s00_vs,
+    sizeof(g_s00_vs), &IID_ID3D12RootSignature, &game_state->pso_rs));
+
+  VHR(ID3D12Device14_CreateGraphicsPipelineState(gc->device,
+    &(D3D12_GRAPHICS_PIPELINE_STATE_DESC){
+      .VS = { g_s00_vs, sizeof(g_s00_vs) },
+      .PS = { g_s00_ps, sizeof(g_s00_ps) },
+      .BlendState = {
+        .RenderTarget = {
+          { .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL },
+        },
+      },
+      .SampleMask = 0xffffffff,
+      .RasterizerState = {
+        .FillMode = D3D12_FILL_MODE_SOLID,
+        //.FillMode = D3D12_FILL_MODE_WIREFRAME,
+        .CullMode = D3D12_CULL_MODE_NONE,
+      },
+      .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+      .NumRenderTargets = 1,
+      .RTVFormats = { GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT },
+      .SampleDesc = { .Count = 1 },
+    },
+    &IID_ID3D12PipelineState, &game_state->pso[0]));
 }
 
 static void
@@ -118,6 +149,12 @@ game_deinit(GameState *game_state)
   GpuContext *gc = game_state->gpu_context;
 
   gpu_finish_commands(gc);
+
+  SAFE_RELEASE(game_state->pso_rs);
+  for (uint32_t i = 0; i < PSO_MAX; ++i) {
+    SAFE_RELEASE(game_state->pso[i]);
+  }
+
   gpu_deinit_context(gc);
   M_FREE(gc);
 }
