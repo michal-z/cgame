@@ -234,6 +234,13 @@ game_draw(GameState *game_state)
   ID3D12GraphicsCommandList10_ClearRenderTargetView(cmdlist, rt_descriptor,
     (float[4]){ 0.2f, 0.4f, 0.8f, 1.0f }, 0, NULL);
 
+  ID3D12GraphicsCommandList10_IASetPrimitiveTopology(cmdlist,
+    D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmdlist,
+    game_state->pso_rs);
+  ID3D12GraphicsCommandList10_SetPipelineState(cmdlist, game_state->pso[0]);
+  ID3D12GraphicsCommandList10_DrawInstanced(cmdlist, 3, 1, 0, 0);
+
   ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
     &(D3D12_BARRIER_GROUP){
       .Type = D3D12_BARRIER_TYPE_TEXTURE,
