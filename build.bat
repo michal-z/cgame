@@ -32,17 +32,23 @@ IF EXIST *.exe DEL *.exe
 )
 
 SET COMPILE_HLSL=0
+SET LAST_SHADER=0
 IF "%1"=="hlsl" SET COMPILE_HLSL=1
 IF "%1"=="clean" SET COMPILE_HLSL=1
 
 IF %COMPILE_HLSL%==1 (
 IF EXIST %HLSL_OUT_DIR%\*.h DEL %HLSL_OUT_DIR%\*.h
 
-%DXC% %HLSL_FLAGS% /T vs_%HLSL_SM% /E s00_vs /D_s00 src\shaders\shaders.c ^
-/Fh %HLSL_OUT_DIR%\s00_vs.h
+FOR /L %%i IN (0, 1, %LAST_SHADER%) DO (
+SET "SH=000000%%i"
+SET SH=s!SH:~-2!
 
-%DXC% %HLSL_FLAGS% /T ps_%HLSL_SM% /E s00_ps /D_s00 src\shaders\shaders.c ^
-/Fh %HLSL_OUT_DIR%\s00_ps.h
+%DXC% %HLSL_FLAGS% /T vs_%HLSL_SM% /E !SH!_vs /D_!SH! src\shaders\shaders.c ^
+/Fh %HLSL_OUT_DIR%\!SH!_vs.h
+
+%DXC% %HLSL_FLAGS% /T ps_%HLSL_SM% /E !SH!_ps /D_!SH! src\shaders\shaders.c ^
+/Fh %HLSL_OUT_DIR%\!SH!_ps.h
+)
 )
 
 IF NOT EXIST pch.lib (
