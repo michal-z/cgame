@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "gpu_context.h"
+#include "cpu_gpu_common.h"
 
 #include "shaders/cso/s00_vs.h"
 #include "shaders/cso/s00_ps.h"
@@ -94,6 +95,7 @@ create_window(const char *name, int32_t width, int32_t height)
 }
 
 #define PSO_MAX 16
+#define STATIC_GEO_BUFFER_SIZE (100000 * sizeof(Vertex))
 
 typedef struct GameState
 {
@@ -101,6 +103,7 @@ typedef struct GameState
   GpuContext *gpu_context;
   ID3D12RootSignature *pso_rs;
   ID3D12PipelineState *pso[PSO_MAX];
+  ID3D12Resource *static_geo_buffer;
 } GameState;
 
 static void
@@ -141,6 +144,85 @@ game_init(GameState *game_state)
       .SampleDesc = { .Count = 1 },
     },
     &IID_ID3D12PipelineState, &game_state->pso[0]));
+
+  VHR(ID3D12Device14_CreateCommittedResource3(gc->device,
+    &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
+    D3D12_HEAP_FLAG_NONE,
+    &(D3D12_RESOURCE_DESC1){
+      .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+      .Width = STATIC_GEO_BUFFER_SIZE,
+      .Height = 1,
+      .DepthOrArraySize = 1,
+      .MipLevels = 1,
+      .SampleDesc = { .Count = 1 },
+      .Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+    },
+    D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, NULL, 0, NULL,
+    &IID_ID3D12Resource, &game_state->static_geo_buffer));
+
+  ID3D12Device14_CreateShaderResourceView(gc->device,
+    game_state->static_geo_buffer,
+    &(D3D12_SHADER_RESOURCE_VIEW_DESC){
+      .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+      .Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+      .Buffer = {
+        .FirstElement = 0,
+        .NumElements = STATIC_GEO_BUFFER_SIZE / sizeof(Vertex),
+        .StructureByteStride = sizeof(Vertex),
+      },
+    },
+    (D3D12_CPU_DESCRIPTOR_HANDLE){
+      .ptr = gc->shader_dheap_start_cpu.ptr + RDH_STATIC_GEO_BUFFER
+        * gc->shader_dheap_descriptor_size
+    });
+
+  {
+    GpuUploadBufferRegion bregion = gpu_alloc_upload_memory(gc, 3 *
+      sizeof(Vertex));
+    {
+      Vertex *v = bregion.ptr;
+      *v++ = (Vertex){ .x = -1.0f, .y = -1.0f };
+      *v++ = (Vertex){ .x =  0.0f, .y =  1.0f };
+      *v++ = (Vertex){ .x =  0.8f, .y = -0.7f };
+    }
+
+    VHR(ID3D12CommandAllocator_Reset(gc->command_allocators[0]));
+    VHR(ID3D12GraphicsCommandList10_Reset(gc->command_list,
+      gc->command_allocators[0], NULL));
+
+    ID3D12GraphicsCommandList10_Barrier(gc->command_list, 1,
+      &(D3D12_BARRIER_GROUP){
+        .Type = D3D12_BARRIER_TYPE_BUFFER,
+        .NumBarriers = 2,
+        .pBufferBarriers = (D3D12_BUFFER_BARRIER[]){
+          { .SyncBefore = D3D12_BARRIER_SYNC_NONE,
+            .SyncAfter = D3D12_BARRIER_SYNC_COPY,
+            .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
+            .AccessAfter = D3D12_BARRIER_ACCESS_COPY_SOURCE,
+            .pResource = gc->upload_heaps[0].buffer,
+            .Size = UINT64_MAX,
+          },
+          { .SyncBefore = D3D12_BARRIER_SYNC_NONE,
+            .SyncAfter = D3D12_BARRIER_SYNC_COPY,
+            .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
+            .AccessAfter = D3D12_BARRIER_ACCESS_COPY_DEST,
+            .pResource = game_state->static_geo_buffer,
+            .Size = UINT64_MAX,
+          },
+        },
+      });
+
+    ID3D12GraphicsCommandList10_CopyBufferRegion(gc->command_list,
+      game_state->static_geo_buffer, 0, bregion.buffer, bregion.offset,
+      3 * sizeof(Vertex));
+
+    VHR(ID3D12GraphicsCommandList10_Close(gc->command_list));
+
+    ID3D12CommandQueue_ExecuteCommandLists(gc->command_queue, 1,
+      (ID3D12CommandList **)&gc->command_list);
+
+    gpu_finish_commands(gc);
+  }
 }
 
 static void
@@ -150,6 +232,7 @@ game_deinit(GameState *game_state)
 
   gpu_finish_commands(gc);
 
+  SAFE_RELEASE(game_state->static_geo_buffer);
   SAFE_RELEASE(game_state->pso_rs);
   for (uint32_t i = 0; i < PSO_MAX; ++i) {
     SAFE_RELEASE(game_state->pso[i]);

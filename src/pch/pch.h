@@ -56,6 +56,10 @@ void mem_free(void *ptr, const char *file, int32_t line);
 #define ID3D12Device14_CreateGraphicsPipelineState(This,...)	\
   ( (This)->lpVtbl -> CreateGraphicsPipelineState(This,__VA_ARGS__) )
 
+#undef ID3D12Device14_CreateShaderResourceView
+#define ID3D12Device14_CreateShaderResourceView(This,...)	\
+  ( (This)->lpVtbl -> CreateShaderResourceView(This,__VA_ARGS__) )
+
 #undef ID3D12Resource_Map
 #define ID3D12Resource_Map(This,...)	\
   ( (This)->lpVtbl -> Map(This,__VA_ARGS__) )

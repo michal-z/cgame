@@ -83,7 +83,7 @@ typedef struct GpuUploadBufferRegion
 {
   void *ptr;
   ID3D12Resource *buffer;
-  uint64_t buffer_offset;
+  uint64_t offset;
 } GpuUploadBufferRegion;
 
 void gpu_init_context(GpuContext *gc, HWND window);

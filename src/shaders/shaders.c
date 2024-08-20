@@ -1,3 +1,5 @@
+#include "../cpu_gpu_common.h"
+
 #if _S00
 
 #define root_signature "RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED)"
@@ -6,8 +8,11 @@
 void s00_vs(uint vertex_id : SV_VertexID,
   out float4 out_position : SV_Position)
 {
-  float2 verts[3] = { float2(-0.7, -0.7), float2(0.0, 0.7), float2(0.7, -0.7) };
-  out_position = float4(verts[vertex_id], 0.0, 1.0);
+  StructuredBuffer<Vertex> vb = ResourceDescriptorHeap[RDH_STATIC_GEO_BUFFER];
+
+  Vertex v = vb[vertex_id];
+
+  out_position = float4(v.x, v.y, 0.0, 1.0);
 }
 
 [RootSignature(root_signature)]

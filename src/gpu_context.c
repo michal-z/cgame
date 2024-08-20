@@ -517,6 +517,6 @@ gpu_alloc_upload_memory(GpuContext *gc, uint32_t size)
   return (GpuUploadBufferRegion){
     .ptr = ptr,
     .buffer = gc->upload_heaps[gc->frame_index].buffer,
-    .buffer_offset = gc->upload_heaps[gc->frame_index].size - asize,
+    .offset = gc->upload_heaps[gc->frame_index].size - asize,
   };
 }
