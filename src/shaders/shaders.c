@@ -1,6 +1,6 @@
 #include "../cpu_gpu_common.h"
 
-#if _S00
+#if _s00
 
 #define root_signature "RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED)"
 
