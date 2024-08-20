@@ -440,8 +440,8 @@ gpu_present_frame(GpuContext *gc)
   gc->upload_heaps[gc->frame_index].size = 0;
 }
 
-GpuWindowState
-gpu_handle_window_resize(GpuContext *gc)
+GpuContextState
+gpu_update_context(GpuContext *gc)
 {
   assert(gc && gc->device);
 
@@ -454,7 +454,7 @@ gpu_handle_window_resize(GpuContext *gc)
       gc->viewport_height = 0;
       LOG("[gpu_context] Window minimized.");
     }
-    return GpuWindowState_Minimized;
+    return GpuContextState_WindowMinimized;
   }
 
   if (current_rect.right != gc->viewport_width ||
@@ -491,10 +491,10 @@ gpu_handle_window_resize(GpuContext *gc)
     gc->viewport_height = current_rect.bottom;
     gc->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gc->swap_chain);
 
-    return GpuWindowState_Resized;
+    return GpuContextState_WindowResized;
   }
 
-  return GpuWindowState_Unchanged;
+  return GpuContextState_Normal;
 }
 
 GpuUploadBufferRegion

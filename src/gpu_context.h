@@ -72,12 +72,13 @@ typedef struct GpuContext
   GpuUploadMemoryHeap upload_heaps[GPU_MAX_BUFFERED_FRAMES];
 } GpuContext;
 
-typedef enum GpuWindowState
+typedef enum GpuContextState
 {
-  GpuWindowState_Unchanged,
-  GpuWindowState_Minimized,
-  GpuWindowState_Resized,
-} GpuWindowState;
+  GpuContextState_Normal,
+  GpuContextState_WindowMinimized,
+  GpuContextState_WindowResized,
+  GpuContextState_DeviceLost,
+} GpuContextState;
 
 typedef struct GpuUploadBufferRegion
 {
@@ -88,7 +89,7 @@ typedef struct GpuUploadBufferRegion
 
 void gpu_init_context(GpuContext *gc, HWND window);
 void gpu_deinit_context(GpuContext *gc);
+GpuContextState gpu_update_context(GpuContext *gc);
 void gpu_finish_commands(GpuContext *gc);
 void gpu_present_frame(GpuContext *gc);
-GpuWindowState gpu_handle_window_resize(GpuContext *gc);
 GpuUploadBufferRegion gpu_alloc_upload_memory(GpuContext *gc, uint32_t size);

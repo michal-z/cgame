@@ -249,12 +249,14 @@ game_update(GameState *game_state)
 
   update_frame_stats(gc->window, game_state->name);
 
-  GpuWindowState window_state = gpu_handle_window_resize(gc);
+  GpuContextState gpu_ctx_state = gpu_update_context(gc);
 
-  if (window_state == GpuWindowState_Minimized)
+  if (gpu_ctx_state == GpuContextState_WindowMinimized)
     return false;
 
-  if (window_state == GpuWindowState_Resized) {
+  if (gpu_ctx_state == GpuContextState_WindowResized) {
+    // ...
+  } else if (gpu_ctx_state == GpuContextState_DeviceLost) {
     // ...
   }
 
