@@ -15,6 +15,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "nuklear_with_config.h"
+
 #define LOG(...) do \
 { \
   fprintf(stderr, __VA_ARGS__); \

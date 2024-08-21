@@ -7,7 +7,8 @@ SET CC=cl.exe
 SET CONFIG=D
 SET C_FLAGS=/std:c17 /experimental:c11atomics /GR- /nologo /Gm- /WX /Wall ^
 /wd4191 /wd4820 /wd4255 /wd5045 /wd4505 /I"src" /I"src\pch" /I"src\deps" ^
-/wd4710 /wd4711 /I"src\deps\d3d12"
+/D_CRT_SECURE_NO_WARNINGS ^
+/wd4710 /wd4711 /I"src\deps\d3d12" /I"src\deps\nuklear"
 
 IF %CONFIG%==D SET C_FLAGS=%C_FLAGS% /GS /Zi /Od /D"_DEBUG" /MTd /RTCs
 IF %CONFIG%==R SET C_FLAGS=%C_FLAGS% /O2 /Gy /MT /D"NDEBUG" /Oi /Ot /GS-
@@ -15,6 +16,10 @@ IF %CONFIG%==R SET C_FLAGS=%C_FLAGS% /O2 /Gy /MT /D"NDEBUG" /Oi /Ot /GS-
 SET LINK_FLAGS=/INCREMENTAL:NO /NOLOGO
 IF %CONFIG%==D SET LINK_FLAGS=%LINK_FLAGS% /DEBUG:FULL
 IF %CONFIG%==R SET LINK_FLAGS=%LINK_FLAGS%
+
+set LIB_FLAGS=/NOLOGO
+if %CONFIG%==D set LIB_FLAGS=%LIB_FLAGS%
+if %CONFIG%==R set LIB_FLAGS=%LIB_FLAGS%
 
 SET DXC=bin\dxc.exe
 SET HLSL_OUT_DIR=src\shaders\cso
@@ -55,10 +60,19 @@ IF NOT EXIST pch.lib (
 %CC% %C_FLAGS% /Fo"pch.lib" /Fp"pch.pch" /c /Yc"pch.h" "src\pch\pch.c"
 ) & if ERRORLEVEL 1 GOTO error
 
+IF NOT EXIST nuklear.lib (
+cd src\deps\nuklear
+%CC% %C_FLAGS% /wd4127 /wd4116 /wd4061 /wd4701 /c "nuklear_with_config.c"
+lib %LIB_FLAGS% *.obj /OUT:"..\..\..\nuklear.lib"
+IF EXIST *.obj DEL *.obj
+IF EXIST *.pdb DEL *.pdb
+cd ..\..\..
+) & if ERRORLEVEL 1 GOTO error
+
 IF NOT "%1"=="hlsl" (
 IF EXIST %NAME%.exe DEL %NAME%.exe
 %CC% %C_FLAGS% /MP /Fp"pch.pch" /Yu"pch.h" "src\*.c" /link %LINK_FLAGS% ^
-/OUT:%NAME%.exe d3d12.lib dxgi.lib user32.lib pch.lib
+/OUT:%NAME%.exe d3d12.lib dxgi.lib user32.lib pch.lib nuklear.lib
 IF "%1"=="run" IF EXIST %NAME%.exe %NAME%.exe
 )
 

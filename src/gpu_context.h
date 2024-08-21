@@ -18,10 +18,10 @@
 
 typedef struct GpuUploadMemoryHeap
 {
-    ID3D12Resource *buffer;
-    uint8_t *ptr;
-    uint32_t size;
-    uint32_t capacity;
+  ID3D12Resource *buffer;
+  uint8_t *ptr;
+  uint32_t size;
+  uint32_t capacity;
 } GpuUploadMemoryHeap;
 
 typedef struct GpuContext
