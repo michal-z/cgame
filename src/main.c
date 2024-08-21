@@ -5,6 +5,13 @@
 #include "shaders/cso/s00_vs.h"
 #include "shaders/cso/s00_ps.h"
 
+#pragma warning(push)
+#pragma warning(disable : 4242)
+#pragma warning(disable : 4244)
+#define NK_D3D12_IMPLEMENTATION
+#include "nuklear_d3d12.h"
+#pragma warning(pop)
+
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
 
@@ -22,6 +29,10 @@ process_window_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       }
       break;
   }
+
+  if (nk_d3d12_handle_event(hwnd, message, wparam, lparam))
+    return 0;
+
   return DefWindowProcA(hwnd, message, wparam, lparam);
 }
 
@@ -104,6 +115,7 @@ typedef struct GameState
   ID3D12RootSignature *pso_rs;
   ID3D12PipelineState *pso[PSO_MAX];
   ID3D12Resource *static_geo_buffer;
+  struct nk_context *gui;
 } GameState;
 
 static void
@@ -176,6 +188,34 @@ game_init(GameState *game_state)
         * gc->shader_dheap_descriptor_size
     });
 
+  game_state->gui = nk_d3d12_init((ID3D12Device *)gc->device, gc->viewport_width,
+    gc->viewport_height, 512 * 1024, 128 * 1024, 6);
+
+  {
+    VHR(ID3D12CommandAllocator_Reset(gc->command_allocators[0]));
+    VHR(ID3D12GraphicsCommandList10_Reset(gc->command_list,
+      gc->command_allocators[0], NULL));
+
+    struct nk_font_atlas *atlas;
+    nk_d3d12_font_stash_begin(&atlas);
+
+    struct nk_font *robot = nk_font_atlas_add_from_file(atlas,
+      "assets/extra_font/Roboto-Regular.ttf", 64.0f, 0);
+
+    nk_d3d12_font_stash_end((ID3D12GraphicsCommandList *)gc->command_list);
+
+    nk_style_set_font(game_state->gui, &robot->handle);
+
+    VHR(ID3D12GraphicsCommandList10_Close(gc->command_list));
+
+    ID3D12CommandQueue_ExecuteCommandLists(gc->command_queue, 1,
+      (ID3D12CommandList **)&gc->command_list);
+
+    gpu_finish_commands(gc);
+
+    nk_d3d12_font_stash_cleanup();
+  }
+
   {
     GpuUploadBufferRegion bregion = gpu_alloc_upload_memory(gc, 3 *
       sizeof(Vertex));
@@ -231,6 +271,8 @@ game_deinit(GameState *game_state)
   GpuContext *gc = game_state->gpu_context;
 
   gpu_finish_commands(gc);
+
+  nk_d3d12_shutdown();
 
   SAFE_RELEASE(game_state->static_geo_buffer);
   SAFE_RELEASE(game_state->pso_rs);
@@ -319,6 +361,8 @@ game_draw(GameState *game_state)
   ID3D12GraphicsCommandList10_ClearRenderTargetView(cmdlist, rt_descriptor,
     (float[4]){ 0.2f, 0.4f, 0.8f, 1.0f }, 0, NULL);
 
+  nk_d3d12_render((ID3D12GraphicsCommandList *)cmdlist, NK_ANTI_ALIASING_ON);
+
   ID3D12GraphicsCommandList10_IASetPrimitiveTopology(cmdlist,
     D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmdlist,
@@ -357,15 +401,63 @@ main(void)
   GameState game_state = { .name = "cgame" };
   game_init(&game_state);
 
-  while (true) {
+  bool running = true;
+
+  while (running) {
     MSG msg = {0};
-    if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+    nk_input_begin(game_state.gui);
+    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+      if (msg.message == WM_QUIT)
+        running = false;
       TranslateMessage(&msg);
       DispatchMessage(&msg);
-      if (msg.message == WM_QUIT) break;
-    } else {
-      if (game_update(&game_state)) game_draw(&game_state);
     }
+    nk_input_end(game_state.gui);
+
+    struct nk_context *ctx = game_state.gui;
+    struct nk_colorf bg;
+
+    bg.r = 0.10f, bg.g = 0.18f, bg.b = 0.24f, bg.a = 1.0f;
+
+    /* GUI */
+    if (nk_begin(ctx, "Demo", nk_rect(50, 50, 2*230, 2*250),
+      NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
+      NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
+    {
+      enum {EASY, HARD};
+      static int op = EASY;
+      static int property = 20;
+
+      nk_layout_row_static(ctx, 120.0f, 400, 1);
+      if (nk_button_label(ctx, "Click me!"))
+        fprintf(stdout, "button pressed\n");
+
+#if 0
+      nk_layout_row_dynamic(ctx, 30, 2);
+      if (nk_option_label(ctx, "easy", op == EASY)) op = EASY;
+      if (nk_option_label(ctx, "hard", op == HARD)) op = HARD;
+      nk_layout_row_dynamic(ctx, 22, 1);
+      nk_property_int(ctx, "Compression:", 0, &property, 100, 10, 1);
+
+      nk_layout_row_dynamic(ctx, 20, 1);
+      nk_label(ctx, "background:", NK_TEXT_LEFT);
+      nk_layout_row_dynamic(ctx, 25, 1);
+
+      if (nk_combo_begin_color(ctx, nk_rgb_cf(bg), nk_vec2(nk_widget_width(ctx),400))) {
+        nk_layout_row_dynamic(ctx, 120, 1);
+        bg = nk_color_picker(ctx, bg, NK_RGBA);
+        nk_layout_row_dynamic(ctx, 25, 1);
+        bg.r = nk_propertyf(ctx, "#R:", 0, bg.r, 1.0f, 0.01f,0.005f);
+        bg.g = nk_propertyf(ctx, "#G:", 0, bg.g, 1.0f, 0.01f,0.005f);
+        bg.b = nk_propertyf(ctx, "#B:", 0, bg.b, 1.0f, 0.01f,0.005f);
+        bg.a = nk_propertyf(ctx, "#A:", 0, bg.a, 1.0f, 0.01f,0.005f);
+        nk_combo_end(ctx);
+      }
+#endif
+    }
+    nk_end(ctx);
+
+    if (game_update(&game_state)) game_draw(&game_state);
   }
 
   game_deinit(&game_state);

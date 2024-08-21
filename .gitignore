@@ -4,7 +4,6 @@
 *.exe
 *.cso
 src/shaders/cso/*.h
-imgui.ini
 .vs
 !d3d12/D3D12Core.pdb
 !d3d12/d3d12SDKLayers.pdb
