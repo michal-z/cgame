@@ -19,7 +19,8 @@
 typedef struct GpuUploadMemoryHeap
 {
   ID3D12Resource *buffer;
-  uint8_t *ptr;
+  uint8_t *cpu_base_addr;
+  D3D12_GPU_VIRTUAL_ADDRESS gpu_base_addr;
   uint32_t size;
   uint32_t capacity;
 } GpuUploadMemoryHeap;
@@ -82,9 +83,10 @@ typedef enum GpuContextState
 
 typedef struct GpuUploadBufferRegion
 {
-  void *ptr;
+  void *cpu_addr;
+  D3D12_GPU_VIRTUAL_ADDRESS gpu_addr;
   ID3D12Resource *buffer;
-  uint64_t offset;
+  uint64_t buffer_offset;
 } GpuUploadBufferRegion;
 
 void gpu_init_context(GpuContext *gc, HWND window);

@@ -27,24 +27,25 @@ umh_init(GpuUploadMemoryHeap *umh, ID3D12Device14 *device, uint32_t capacity)
     &umh->buffer));
 
   VHR(ID3D12Resource_Map(umh->buffer, 0, &(D3D12_RANGE){ .Begin = 0, .End = 0 },
-    &umh->ptr));
+    &umh->cpu_base_addr));
+
+  umh->gpu_base_addr = ID3D12Resource_GetGPUVirtualAddress(umh->buffer);
 }
 
 static void
 umh_deinit(GpuUploadMemoryHeap *umh)
 {
   SAFE_RELEASE(umh->buffer);
-  umh->size = umh->capacity = 0;
-  umh->ptr = NULL;
+  memset(umh, 0, sizeof(*umh));
 }
 
 static void *
 umh_alloc(GpuUploadMemoryHeap *umh, uint32_t size)
 {
   assert(umh && umh->buffer && size > 0);
-  uint32_t asize = (size + (UMH_ALLOC_ALIGNMENT - 1)) & ~(UMH_ALLOC_ALIGNMENT- 1);
+  uint32_t asize = (size + (UMH_ALLOC_ALIGNMENT - 1)) & ~(UMH_ALLOC_ALIGNMENT - 1);
   if ((umh->size + asize) >= umh->capacity) return NULL;
-  uint8_t *ptr = umh->ptr + umh->size;
+  uint8_t *ptr = umh->cpu_base_addr + umh->size;
   umh->size += asize;
   return ptr;
 }
@@ -502,21 +503,24 @@ gpu_alloc_upload_memory(GpuContext *gc, uint32_t size)
 {
   assert(gc && gc->device && size > 0);
 
-  void *ptr = umh_alloc(&gc->upload_heaps[gc->frame_index], size);
-  if (ptr == NULL) {
+  void *cpu_addr = umh_alloc(&gc->upload_heaps[gc->frame_index], size);
+  if (cpu_addr == NULL) {
     LOG("[gpu_context] Upload memory exhausted - waiting for the GPU... "
       "(command list state is lost!).");
     gpu_finish_commands(gc);
-    ptr = umh_alloc(&gc->upload_heaps[gc->frame_index], size);
-    assert(ptr);
+    cpu_addr = umh_alloc(&gc->upload_heaps[gc->frame_index], size);
+    assert(cpu_addr);
   }
 
   uint32_t asize = (size + (UMH_ALLOC_ALIGNMENT - 1)) &
     ~(UMH_ALLOC_ALIGNMENT - 1);
 
+  uint64_t offset = gc->upload_heaps[gc->frame_index].size - asize;
+
   return (GpuUploadBufferRegion){
-    .ptr = ptr,
+    .cpu_addr = gc->upload_heaps[gc->frame_index].cpu_base_addr + offset,
+    .gpu_addr = gc->upload_heaps[gc->frame_index].gpu_base_addr + offset,
     .buffer = gc->upload_heaps[gc->frame_index].buffer,
-    .offset = gc->upload_heaps[gc->frame_index].size - asize,
+    .buffer_offset = offset,
   };
 }

@@ -220,7 +220,7 @@ game_init(GameState *game_state)
     GpuUploadBufferRegion bregion = gpu_alloc_upload_memory(gc, 3 *
       sizeof(Vertex));
     {
-      Vertex *v = bregion.ptr;
+      Vertex *v = bregion.cpu_addr;
       *v++ = (Vertex){ .x = -1.0f, .y = -1.0f };
       *v++ = (Vertex){ .x =  0.0f, .y =  1.0f };
       *v++ = (Vertex){ .x =  0.8f, .y = -0.7f };
@@ -253,7 +253,7 @@ game_init(GameState *game_state)
       });
 
     ID3D12GraphicsCommandList10_CopyBufferRegion(gc->command_list,
-      game_state->static_geo_buffer, 0, bregion.buffer, bregion.offset,
+      game_state->static_geo_buffer, 0, bregion.buffer, bregion.buffer_offset,
       3 * sizeof(Vertex));
 
     VHR(ID3D12GraphicsCommandList10_Close(gc->command_list));
@@ -361,14 +361,14 @@ game_draw(GameState *game_state)
   ID3D12GraphicsCommandList10_ClearRenderTargetView(cmdlist, rt_descriptor,
     (float[4]){ 0.2f, 0.4f, 0.8f, 1.0f }, 0, NULL);
 
-  nk_d3d12_render((ID3D12GraphicsCommandList *)cmdlist, NK_ANTI_ALIASING_ON);
-
   ID3D12GraphicsCommandList10_IASetPrimitiveTopology(cmdlist,
     D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmdlist,
     game_state->pso_rs);
   ID3D12GraphicsCommandList10_SetPipelineState(cmdlist, game_state->pso[0]);
   ID3D12GraphicsCommandList10_DrawInstanced(cmdlist, 3, 1, 0, 0);
+
+  nk_d3d12_render((ID3D12GraphicsCommandList *)cmdlist, NK_ANTI_ALIASING_ON);
 
   ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
     &(D3D12_BARRIER_GROUP){
