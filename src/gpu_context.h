@@ -83,7 +83,7 @@ typedef enum GpuContextState
 
 typedef struct GpuUploadBufferRegion
 {
-  void *cpu_addr;
+  uint8_t *cpu_addr;
   D3D12_GPU_VIRTUAL_ADDRESS gpu_addr;
   ID3D12Resource *buffer;
   uint64_t buffer_offset;

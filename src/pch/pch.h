@@ -86,6 +86,10 @@ void mem_free(void *ptr, const char *file, int32_t line);
 #define ID3D12GraphicsCommandList10_RSSetScissorRects(This,...)	\
   ( (This)->lpVtbl -> RSSetScissorRects(This,__VA_ARGS__) )
 
+#undef ID3D12GraphicsCommandList10_CopyTextureRegion
+#define ID3D12GraphicsCommandList10_CopyTextureRegion(This,...)	\
+  ( (This)->lpVtbl -> CopyTextureRegion(This,__VA_ARGS__) )
+
 #undef ID3D12GraphicsCommandList10_OMSetRenderTargets
 #define ID3D12GraphicsCommandList10_OMSetRenderTargets(This,...)	\
   ( (This)->lpVtbl -> OMSetRenderTargets(This,__VA_ARGS__) )
