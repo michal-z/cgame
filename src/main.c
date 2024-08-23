@@ -191,17 +191,13 @@ gui_handle_event(struct nk_context *ctx, HWND wnd, UINT msg, WPARAM wparam,
         case VK_TAB: nk_input_key(ctx, NK_KEY_TAB, down); return 1;
 
         case VK_LEFT:
-          if (ctrl)
-            nk_input_key(ctx, NK_KEY_TEXT_WORD_LEFT, down);
-          else
-            nk_input_key(ctx, NK_KEY_LEFT, down);
+          if (ctrl) nk_input_key(ctx, NK_KEY_TEXT_WORD_LEFT, down);
+          else nk_input_key(ctx, NK_KEY_LEFT, down);
           return 1;
 
         case VK_RIGHT:
-          if (ctrl)
-            nk_input_key(ctx, NK_KEY_TEXT_WORD_RIGHT, down);
-          else
-            nk_input_key(ctx, NK_KEY_RIGHT, down);
+          if (ctrl) nk_input_key(ctx, NK_KEY_TEXT_WORD_RIGHT, down);
+          else nk_input_key(ctx, NK_KEY_RIGHT, down);
           return 1;
 
         case VK_BACK: nk_input_key(ctx, NK_KEY_BACKSPACE, down); return 1;
