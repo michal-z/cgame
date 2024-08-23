@@ -197,17 +197,13 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
     float R = (float)gc->viewport_width;
     float T = 0.0f;
     float B = (float)gc->viewport_height;
-    float matrix[4][4] = {
-      { 0.0f, 0.0f, 0.0f, 0.0f },
-      { 0.0f, 0.0f, 0.0f, 0.0f },
-      { 0.0f, 0.0f, 0.5f, 0.5f },
-      { 0.0f, 0.0f, 0.0f, 1.0f },
+    float mvp[4][4] = {
+      { 2.0f/(R-L),   0.0f,           0.0f,       0.0f },
+      { 0.0f,         2.0f/(T-B),     0.0f,       0.0f },
+      { 0.0f,         0.0f,           0.5f,       0.0f },
+      { (R+L)/(L-R),  (T+B)/(B-T),    0.5f,       1.0f },
     };
-    matrix[0][0] = 2.0f / (R - L);
-    matrix[1][1] = 2.0f / (T - B);
-    matrix[0][3] = (R + L) / (L - R);
-    matrix[1][3] = (T + B) / (B - T);
-    memcpy(upload_cb.cpu_addr, matrix, sizeof(matrix));
+    memcpy(upload_cb.cpu_addr, mvp, sizeof(mvp));
   }
 
   ID3D12GraphicsCommandList10_SetGraphicsRootConstantBufferView(cmdlist, 0,
@@ -263,6 +259,16 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
           .Size = GUI_MAX_INDEX_BUFFER,
         },
       },
+    });
+
+  ID3D12GraphicsCommandList10_RSSetViewports(cmdlist, 1,
+    &(D3D12_VIEWPORT){
+      .TopLeftX = 0.0f,
+      .TopLeftY = 0.0f,
+      .Width = (float)gc->viewport_width,
+      .Height = (float)gc->viewport_height,
+      .MinDepth = 0.0f,
+      .MaxDepth = 1.0f,
     });
 
   ID3D12GraphicsCommandList10_IASetVertexBuffers(cmdlist, 0, 1,
@@ -632,12 +638,12 @@ game_init(GameState *game_state)
       ID3D12Device14_GetCopyableFootprints(gc->device, &desc, 0, 1, 0, &layout,
         NULL, NULL, &required_size);
 
-      GpuUploadBufferRegion bregion = gpu_alloc_upload_memory(gc, 
+      GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gc,
         (uint32_t)required_size);
-      layout.Offset = bregion.buffer_offset;
+      layout.Offset = upload.buffer_offset;
 
       for (uint32_t y = 0; y < layout.Footprint.Height; ++y) {
-        memcpy(bregion.cpu_addr + y * layout.Footprint.RowPitch,
+        memcpy(upload.cpu_addr + y * layout.Footprint.RowPitch,
           (uint8_t *)font_image + y * (font_w * 4), font_w * 4);
       }
 
@@ -649,7 +655,7 @@ game_init(GameState *game_state)
         },
         0, 0, 0,
         &(D3D12_TEXTURE_COPY_LOCATION){
-          .pResource = bregion.buffer,
+          .pResource = upload.buffer,
           .Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
           .PlacedFootprint = layout,
         },

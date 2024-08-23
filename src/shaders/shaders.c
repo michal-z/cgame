@@ -46,8 +46,8 @@ void s01_vs(float2 position : _Pos,
   out float2 out_uv : _Uv,
   out float4 out_color : _Color)
 {
-  out_position = mul(float4(position, 0.0f, 1.0f),
-    g_const_buffer0.screen_to_clip);
+  out_position = mul(g_const_buffer0.screen_to_clip,
+    float4(position, 0.0f, 1.0f));
   out_uv = uv;
   out_color = color;
 }
