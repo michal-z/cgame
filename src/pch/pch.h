@@ -82,6 +82,14 @@ void mem_free(void *ptr, const char *file, int32_t line);
 #define ID3D12GraphicsCommandList10_RSSetViewports(This,...)	\
   ( (This)->lpVtbl -> RSSetViewports(This,__VA_ARGS__) )
 
+#undef ID3D12GraphicsCommandList10_IASetVertexBuffers
+#define ID3D12GraphicsCommandList10_IASetVertexBuffers(This,...)	\
+  ( (This)->lpVtbl -> IASetVertexBuffers(This,__VA_ARGS__) )
+
+#undef ID3D12GraphicsCommandList10_IASetIndexBuffer
+#define ID3D12GraphicsCommandList10_IASetIndexBuffer(This,...)	\
+  ( (This)->lpVtbl -> IASetIndexBuffer(This,__VA_ARGS__) )
+
 #undef ID3D12GraphicsCommandList10_RSSetScissorRects
 #define ID3D12GraphicsCommandList10_RSSetScissorRects(This,...)	\
   ( (This)->lpVtbl -> RSSetScissorRects(This,__VA_ARGS__) )

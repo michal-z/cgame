@@ -94,7 +94,14 @@ create_window(const char *name, int32_t width, int32_t height)
 }
 
 #define GUI_MAX_VERTEX_BUFFER (512 * 1024)
-#define GUI_MAX_INDEX_BUFFER (128 * 1024)
+#define GUI_MAX_INDEX_BUFFER  (128 * 1024)
+
+typedef struct GuiVertex
+{
+  float pos[2];
+  float uv[2];
+  uint8_t col[4];
+} GuiVertex;
 
 typedef struct GuiState
 {
@@ -105,6 +112,9 @@ typedef struct GuiState
 
   ID3D12Resource *vertex_buffer;
   ID3D12Resource *index_buffer;
+
+  D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer_addr;
+  D3D12_GPU_VIRTUAL_ADDRESS index_buffer_addr;
 } GuiState;
 
 void
@@ -144,6 +154,11 @@ gui_init(GuiState *gui, GpuContext *gc)
     },
     D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, NULL, 0, NULL,
     &IID_ID3D12Resource, &gui->index_buffer));
+
+  gui->vertex_buffer_addr = ID3D12Resource_GetGPUVirtualAddress(
+    gui->vertex_buffer);
+  gui->index_buffer_addr = ID3D12Resource_GetGPUVirtualAddress(
+    gui->index_buffer);
 }
 
 void
@@ -162,9 +177,127 @@ gui_deinit(GuiState *gui)
 }
 
 void
-gui_draw(GuiState *gui)
+gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso, 
+  ID3D12RootSignature *pso_rs)
 {
-  //nk_d3d12_render((ID3D12GraphicsCommandList *)cmdlist, NK_ANTI_ALIASING_ON);
+  ID3D12GraphicsCommandList10 *cmdlist = gc->command_list;
+
+  ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmdlist, pso_rs);
+  ID3D12GraphicsCommandList10_SetPipelineState(cmdlist, pso);
+
+  GpuUploadBufferRegion upload_vb = gpu_alloc_upload_memory(gc,
+    GUI_MAX_VERTEX_BUFFER);
+  GpuUploadBufferRegion upload_ib = gpu_alloc_upload_memory(gc,
+    GUI_MAX_INDEX_BUFFER);
+  GpuUploadBufferRegion upload_cb = gpu_alloc_upload_memory(gc,
+    sizeof(float) * 4 * 4);
+
+  {
+    float L = 0.0f;
+    float R = (float)gc->viewport_width;
+    float T = 0.0f;
+    float B = (float)gc->viewport_height;
+    float matrix[4][4] = {
+      { 0.0f, 0.0f, 0.0f, 0.0f },
+      { 0.0f, 0.0f, 0.0f, 0.0f },
+      { 0.0f, 0.0f, 0.5f, 0.5f },
+      { 0.0f, 0.0f, 0.0f, 1.0f },
+    };
+    matrix[0][0] = 2.0f / (R - L);
+    matrix[1][1] = 2.0f / (T - B);
+    matrix[0][3] = (R + L) / (L - R);
+    matrix[1][3] = (T + B) / (B - T);
+    memcpy(upload_cb.cpu_addr, matrix, sizeof(matrix));
+  }
+
+  ID3D12GraphicsCommandList10_SetGraphicsRootConstantBufferView(cmdlist, 0,
+    upload_cb.gpu_addr);
+
+  {
+    struct nk_buffer vbuf, ibuf;
+    nk_buffer_init_fixed(&vbuf, upload_vb.cpu_addr, GUI_MAX_VERTEX_BUFFER);
+    nk_buffer_init_fixed(&ibuf, upload_ib.cpu_addr, GUI_MAX_INDEX_BUFFER);
+
+    nk_convert(&gui->ctx, &gui->cmds, &vbuf, &ibuf,
+      &(struct nk_convert_config){
+        .vertex_layout = (struct nk_draw_vertex_layout_element[]){
+          { NK_VERTEX_POSITION, NK_FORMAT_FLOAT, NK_OFFSETOF(GuiVertex, pos) },
+          { NK_VERTEX_TEXCOORD, NK_FORMAT_FLOAT, NK_OFFSETOF(GuiVertex, uv) },
+          { NK_VERTEX_COLOR, NK_FORMAT_R8G8B8A8, NK_OFFSETOF(GuiVertex, col) },
+          { NK_VERTEX_LAYOUT_END },
+        },
+        .vertex_size = sizeof(GuiVertex),
+        .vertex_alignment = NK_ALIGNOF(GuiVertex),
+        .global_alpha = 1.0f,
+        .shape_AA = NK_ANTI_ALIASING_ON,
+        .line_AA = NK_ANTI_ALIASING_ON,
+        .circle_segment_count = 22,
+        .curve_segment_count = 22,
+        .arc_segment_count = 22,
+        .tex_null = gui->tex_null,
+      });
+  }
+
+  ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->vertex_buffer, 0, 
+    upload_vb.buffer, upload_vb.buffer_offset, GUI_MAX_VERTEX_BUFFER);
+  ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->index_buffer, 0, 
+    upload_ib.buffer, upload_ib.buffer_offset, GUI_MAX_INDEX_BUFFER);
+
+  ID3D12GraphicsCommandList10_Barrier(gc->command_list, 1,
+    &(D3D12_BARRIER_GROUP){
+      .Type = D3D12_BARRIER_TYPE_BUFFER,
+      .NumBarriers = 2,
+      .pBufferBarriers = (D3D12_BUFFER_BARRIER[]){
+        { .SyncBefore = D3D12_BARRIER_SYNC_COPY,
+          .SyncAfter = D3D12_BARRIER_SYNC_DRAW,
+          .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
+          .AccessAfter = D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
+          .pResource = gui->vertex_buffer,
+          .Size = GUI_MAX_VERTEX_BUFFER,
+        },
+        { .SyncBefore = D3D12_BARRIER_SYNC_COPY,
+          .SyncAfter = D3D12_BARRIER_SYNC_DRAW,
+          .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
+          .AccessAfter = D3D12_BARRIER_ACCESS_INDEX_BUFFER,
+          .pResource = gui->index_buffer,
+          .Size = GUI_MAX_INDEX_BUFFER,
+        },
+      },
+    });
+
+  ID3D12GraphicsCommandList10_IASetVertexBuffers(cmdlist, 0, 1,
+    &(D3D12_VERTEX_BUFFER_VIEW){
+      .BufferLocation = gui->vertex_buffer_addr,
+      .SizeInBytes = GUI_MAX_VERTEX_BUFFER,
+      .StrideInBytes = sizeof(GuiVertex),
+    });
+  ID3D12GraphicsCommandList10_IASetIndexBuffer(cmdlist,
+    &(D3D12_INDEX_BUFFER_VIEW){
+      .BufferLocation = gui->index_buffer_addr,
+      .SizeInBytes = GUI_MAX_INDEX_BUFFER,
+      .Format = DXGI_FORMAT_R16_UINT,
+    });
+
+  UINT draw_offset = 0;
+  const struct nk_draw_command *cmd;
+
+  nk_draw_foreach(cmd, &gui->ctx, &gui->cmds) {
+    if (cmd->elem_count) {
+      ID3D12GraphicsCommandList10_RSSetScissorRects(cmdlist, 1,
+        &(D3D12_RECT){
+          .left = (LONG)cmd->clip_rect.x,
+          .right = (LONG)(cmd->clip_rect.x + cmd->clip_rect.w),
+          .top = (LONG)cmd->clip_rect.y,
+          .bottom = (LONG)(cmd->clip_rect.y + cmd->clip_rect.h),
+        });
+
+      ID3D12GraphicsCommandList10_DrawIndexedInstanced(cmdlist,
+        (UINT)cmd->elem_count, 1, draw_offset, 0, 0);
+
+      draw_offset += cmd->elem_count;
+    }
+  }
+
   nk_clear(&gui->ctx);
   nk_buffer_clear(&gui->cmds);
 }
@@ -190,50 +323,53 @@ gui_handle_event(struct nk_context *ctx, HWND wnd, UINT msg, WPARAM wparam,
         case VK_RETURN: nk_input_key(ctx, NK_KEY_ENTER, down); return 1;
         case VK_TAB: nk_input_key(ctx, NK_KEY_TAB, down); return 1;
 
-        case VK_LEFT:
+        case VK_LEFT: {
           if (ctrl) nk_input_key(ctx, NK_KEY_TEXT_WORD_LEFT, down);
           else nk_input_key(ctx, NK_KEY_LEFT, down);
           return 1;
-
-        case VK_RIGHT:
+        }
+        case VK_RIGHT: {
           if (ctrl) nk_input_key(ctx, NK_KEY_TEXT_WORD_RIGHT, down);
           else nk_input_key(ctx, NK_KEY_RIGHT, down);
           return 1;
+        }
 
         case VK_BACK: nk_input_key(ctx, NK_KEY_BACKSPACE, down); return 1;
 
-        case VK_HOME:
+        case VK_HOME: {
           nk_input_key(ctx, NK_KEY_TEXT_START, down);
           nk_input_key(ctx, NK_KEY_SCROLL_START, down);
           return 1;
-
-        case VK_END:
+        }
+        case VK_END: {
           nk_input_key(ctx, NK_KEY_TEXT_END, down);
           nk_input_key(ctx, NK_KEY_SCROLL_END, down);
           return 1;
+        }
 
         case VK_NEXT: nk_input_key(ctx, NK_KEY_SCROLL_DOWN, down); return 1;
         case VK_PRIOR: nk_input_key(ctx, NK_KEY_SCROLL_UP, down); return 1;
 
-        case 'C':
+        case 'C': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_COPY, down); return 1; }
           break;
-
-        case 'V':
+        }
+        case 'V': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_PASTE, down); return 1; }
           break;
-
-        case 'X':
+        }
+        case 'X': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_CUT, down); return 1; }
           break;
-
-        case 'Z':
+        }
+        case 'Z': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_TEXT_UNDO, down); return 1; }
           break;
-
-        case 'R':
+        }
+        case 'R': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_TEXT_REDO, down); return 1; }
           break;
+        }
       }
       return 0;
     }
@@ -399,13 +535,14 @@ game_init(GameState *game_state)
       .InputLayout = {
         .NumElements = 3,
         .pInputElementDescs = (D3D12_INPUT_ELEMENT_DESC[]){
-          { "_Pos", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0,
+          { "_Pos", 0, DXGI_FORMAT_R32G32_FLOAT, 0, NK_OFFSETOF(GuiVertex, pos),
             D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
           },
-          { "_Uv", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8,
+          { "_Uv", 0, DXGI_FORMAT_R32G32_FLOAT, 0, NK_OFFSETOF(GuiVertex, uv),
             D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
           },
-          { "_Color", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 16,
+          { "_Color", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0,
+            NK_OFFSETOF(GuiVertex, col),
             D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
           },
         },
@@ -413,6 +550,9 @@ game_init(GameState *game_state)
     },
     &IID_ID3D12PipelineState, &game_state->pso[PSO_GUI]));
 
+  //
+  // Static geometry buffer
+  //
   VHR(ID3D12Device14_CreateCommittedResource3(gc->device,
     &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
     D3D12_HEAP_FLAG_NONE,
@@ -543,10 +683,10 @@ game_init(GameState *game_state)
   }
 
   {
-    GpuUploadBufferRegion bregion = gpu_alloc_upload_memory(gc, 3 *
+    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gc, 3 *
       sizeof(Vertex));
     {
-      Vertex *v = (Vertex *)bregion.cpu_addr;
+      Vertex *v = (Vertex *)upload.cpu_addr;
       *v++ = (Vertex){ .x = -1.0f, .y = -1.0f };
       *v++ = (Vertex){ .x =  0.0f, .y =  1.0f };
       *v++ = (Vertex){ .x =  0.8f, .y = -0.7f };
@@ -557,7 +697,7 @@ game_init(GameState *game_state)
       gc->command_allocators[0], NULL));
 
     ID3D12GraphicsCommandList10_CopyBufferRegion(gc->command_list,
-      game_state->static_geo_buffer, 0, bregion.buffer, bregion.buffer_offset,
+      game_state->static_geo_buffer, 0, upload.buffer, upload.buffer_offset,
       3 * sizeof(Vertex));
 
     VHR(ID3D12GraphicsCommandList10_Close(gc->command_list));
@@ -673,8 +813,8 @@ game_draw(GameState *game_state)
     game_state->pso[PSO_FIRST]);
   ID3D12GraphicsCommandList10_DrawInstanced(cmdlist, 3, 1, 0, 0);
 
-  gui_draw(&game_state->gui);
-  //nk_d3d12_render((ID3D12GraphicsCommandList *)cmdlist, NK_ANTI_ALIASING_ON);
+  gui_draw(&game_state->gui, gc, game_state->pso[PSO_GUI],
+    game_state->pso_rs[PSO_GUI]);
 
   ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
     &(D3D12_BARRIER_GROUP){
