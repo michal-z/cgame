@@ -33,7 +33,7 @@ void s00_ps(float4 position : SV_Position,
 
 struct Const
 {
-  float4x4 screen_to_clip;
+  float4x4 mvp;
 };
 ConstantBuffer<Const> g_const_buffer0: register(b0);
 SamplerState g_sampler0 : register(s0);
@@ -46,8 +46,7 @@ void s01_vs(float2 position : _Pos,
   out float2 out_uv : _Uv,
   out float4 out_color : _Color)
 {
-  out_position = mul(g_const_buffer0.screen_to_clip,
-    float4(position, 0.0f, 1.0f));
+  out_position = mul(g_const_buffer0.mvp, float4(position, 0.0f, 1.0f));
   out_uv = uv;
   out_color = color;
 }

@@ -97,7 +97,7 @@ create_window(const char *name, int32_t width, int32_t height)
 #define PSO_FIRST 0
 #define PSO_GUI 1
 #define PSO_MAX 16
-#define STATIC_GEO_BUFFER_SIZE (100000 * sizeof(Vertex))
+#define STATIC_GEO_BUFFER_SIZE (16 * 1024 * 1024)
 
 typedef struct GameState
 {
