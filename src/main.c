@@ -514,6 +514,21 @@ game_init(GameState *game_state)
           .PlacedFootprint = layout,
         },
         NULL);
+
+      ID3D12GraphicsCommandList10_Barrier(gc->command_list, 1,
+        &(D3D12_BARRIER_GROUP){
+          .Type = D3D12_BARRIER_TYPE_TEXTURE,
+          .NumBarriers = 1,
+          .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+            .SyncBefore = D3D12_BARRIER_SYNC_COPY,
+            .SyncAfter = D3D12_BARRIER_SYNC_NONE,
+            .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
+            .AccessAfter = D3D12_BARRIER_ACCESS_NO_ACCESS,
+            .LayoutBefore = D3D12_BARRIER_LAYOUT_COPY_DEST,
+            .LayoutAfter = D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+            .pResource = game_state->font_texture,
+          },
+        });
     }
 
     VHR(ID3D12GraphicsCommandList10_Close(gc->command_list));
@@ -540,28 +555,6 @@ game_init(GameState *game_state)
     VHR(ID3D12CommandAllocator_Reset(gc->command_allocators[0]));
     VHR(ID3D12GraphicsCommandList10_Reset(gc->command_list,
       gc->command_allocators[0], NULL));
-
-    ID3D12GraphicsCommandList10_Barrier(gc->command_list, 1,
-      &(D3D12_BARRIER_GROUP){
-        .Type = D3D12_BARRIER_TYPE_BUFFER,
-        .NumBarriers = 2,
-        .pBufferBarriers = (D3D12_BUFFER_BARRIER[]){
-          { .SyncBefore = D3D12_BARRIER_SYNC_NONE,
-            .SyncAfter = D3D12_BARRIER_SYNC_COPY,
-            .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
-            .AccessAfter = D3D12_BARRIER_ACCESS_COPY_SOURCE,
-            .pResource = gc->upload_heaps[0].buffer,
-            .Size = UINT64_MAX,
-          },
-          { .SyncBefore = D3D12_BARRIER_SYNC_NONE,
-            .SyncAfter = D3D12_BARRIER_SYNC_COPY,
-            .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
-            .AccessAfter = D3D12_BARRIER_ACCESS_COPY_DEST,
-            .pResource = game_state->static_geo_buffer,
-            .Size = UINT64_MAX,
-          },
-        },
-      });
 
     ID3D12GraphicsCommandList10_CopyBufferRegion(gc->command_list,
       game_state->static_geo_buffer, 0, bregion.buffer, bregion.buffer_offset,
