@@ -170,9 +170,6 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
 {
   ID3D12GraphicsCommandList10 *cmdlist = gc->command_list;
 
-  ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmdlist, pso_rs);
-  ID3D12GraphicsCommandList10_SetPipelineState(cmdlist, pso);
-
   GpuUploadBufferRegion upload_vb = gpu_alloc_upload_memory(gc,
     MAX_VERTEX_BUFFER);
   GpuUploadBufferRegion upload_ib = gpu_alloc_upload_memory(gc,
@@ -180,18 +177,22 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
   GpuUploadBufferRegion upload_cb = gpu_alloc_upload_memory(gc,
     sizeof(float) * 4 * 4);
 
+  ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmdlist, pso_rs);
+  ID3D12GraphicsCommandList10_SetPipelineState(cmdlist, pso);
+
   {
-    float L = 0.0f;
-    float R = (float)gc->viewport_width;
-    float T = 0.0f;
-    float B = (float)gc->viewport_height;
-    float mvp[4][4] = {
-      { 2.0f/(R-L),   0.0f,           0.0f,       0.0f },
-      { 0.0f,         2.0f/(T-B),     0.0f,       0.0f },
-      { 0.0f,         0.0f,           0.5f,       0.0f },
-      { (R+L)/(L-R),  (T+B)/(B-T),    0.5f,       1.0f },
-    };
-    memcpy(upload_cb.cpu_addr, mvp, sizeof(mvp));
+    float l = 0.0f;
+    float r = (float)gc->viewport_width;
+    float t = 0.0f;
+    float b = (float)gc->viewport_height;
+    memcpy(upload_cb.cpu_addr,
+      (float[]){
+        2.0f / (r - l),    0.0f,              0.0f, 0.0f,
+        0.0f,              2.0f / (t - b),    0.0f, 0.0f,
+        0.0f,              0.0f,              0.5f, 0.0f,
+        (r + l) / (l - r), (t + b) / (b - t), 0.5f, 1.0f,
+      },
+      sizeof(float) * 16);
   }
 
   ID3D12GraphicsCommandList10_SetGraphicsRootConstantBufferView(cmdlist, 0,
