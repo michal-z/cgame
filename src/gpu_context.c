@@ -43,7 +43,8 @@ static void *
 umh_alloc(GpuUploadMemoryHeap *umh, uint32_t size)
 {
   assert(umh && umh->buffer && size > 0);
-  uint32_t asize = (size + (UMH_ALLOC_ALIGNMENT - 1)) & ~(UMH_ALLOC_ALIGNMENT - 1);
+  uint32_t asize = (size + (UMH_ALLOC_ALIGNMENT - 1)) &
+    ~(UMH_ALLOC_ALIGNMENT - 1);
   if ((umh->size + asize) >= umh->capacity) return NULL;
   uint8_t *ptr = umh->cpu_base_addr + umh->size;
   umh->size += asize;
@@ -97,8 +98,8 @@ gpu_init_context(GpuContext *gc, HWND window)
     &IID_ID3D12Device, &gc->device)))
   {
     MessageBox(window, "Failed to create Direct3D 12 Device. This applications "
-      "requires graphics card with FEATURE LEVEL 11.1 support. Please update your "
-      "driver and try again.", "DirectX 12 initialization error",
+      "requires graphics card with FEATURE LEVEL 11.1 support. Please "
+      "update your driver and try again.", "DirectX 12 initialization error",
       MB_OK | MB_ICONERROR);
     ExitProcess(1);
   }
