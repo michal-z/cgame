@@ -445,6 +445,9 @@ main(void)
   GameState game_state = { .name = "cgame" };
   game_init(&game_state);
 
+  //UINT dpi = GetDpiForWindow(game_state.gpu_context.window);
+  //printf("DPI: %d Scale: %f\n", dpi, (float)dpi / USER_DEFAULT_SCREEN_DPI);
+
   bool running = true;
 
   while (running) {

@@ -24,8 +24,8 @@ typedef struct GuiState
   D3D12_GPU_VIRTUAL_ADDRESS index_buffer_addr;
 } GuiState;
 
-void gui_init(GuiState *gui, GpuContext *gc, const char *font_file, float 
-  font_height);
+void gui_init(GuiState *gui, GpuContext *gc, const char *font_file,
+  float font_height);
 void gui_deinit(GuiState *gui);
 void gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
   ID3D12RootSignature *pso_rs);
