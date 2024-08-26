@@ -301,9 +301,10 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
 }
 
 bool
-gui_handle_event(struct nk_context *ctx, HWND wnd, UINT msg, WPARAM wparam,
+gui_handle_event(GuiContext *gui, HWND wnd, UINT msg, WPARAM wparam,
   LPARAM lparam)
 {
+  struct nk_context *ctx = &gui->nkctx;
   switch (msg) {
     case WM_KEYDOWN:
     case WM_KEYUP:

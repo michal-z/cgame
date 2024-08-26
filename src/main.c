@@ -448,17 +448,16 @@ main(void)
   bool running = true;
 
   while (running) {
-    nk_input_begin(&game_state.gui_context.nkctx);
-
     MSG msg = {0};
+    nk_input_begin(&game_state.gui_context.nkctx);
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
       if (msg.message == WM_QUIT) running = false;
 
       TranslateMessage(&msg);
       DispatchMessage(&msg);
 
-      gui_handle_event(&game_state.gui_context.nkctx, msg.hwnd, msg.message,
-        msg.wParam, msg.lParam);
+      gui_handle_event(&game_state.gui_context, msg.hwnd, msg.message, msg.wParam,
+        msg.lParam);
     }
     nk_input_end(&game_state.gui_context.nkctx);
 

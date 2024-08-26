@@ -35,5 +35,5 @@ void gui_deinit(GuiContext *gui);
 void gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
   ID3D12RootSignature *pso_rs);
 
-bool gui_handle_event(struct nk_context *ctx, HWND wnd, UINT msg, WPARAM wparam,
+bool gui_handle_event(GuiContext *gui, HWND wnd, UINT msg, WPARAM wparam,
   LPARAM lparam);
