@@ -320,9 +320,9 @@ game_update(GameState *game_state)
   GuiContext *gui = &game_state->gui_context;
   struct nk_context *nkctx = &gui->nkctx;
 
-  if (nk_begin(nkctx, "Demo", nk_rect(0, 0, scale * 200.0f, scale * 300.0f),
-    NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE |
-    NK_WINDOW_MINIMIZABLE | NK_WINDOW_TITLE))
+  if (nk_begin(nkctx, "Demo", nk_rect(10.0f * scale, 10.0f * scale,
+    scale * 200.0f, scale * 300.0f), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
+    NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE | NK_WINDOW_TITLE))
   {
     nk_style_set_font(nkctx, &game_state->fonts[FONT_ROBOTO_16]->handle);
 
