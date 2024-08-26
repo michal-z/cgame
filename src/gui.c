@@ -1,20 +1,20 @@
 #include "pch.h"
 #include "gui.h"
-#include "gpu_context.h"
+#include "gpu.h"
 #include "cpu_gpu_common.h"
 
 #define MAX_VERTEX_BUFFER (512 * 1024)
 #define MAX_INDEX_BUFFER (128 * 1024)
 
 void
-gui_init(GuiState *gui, GpuContext *gc, const char *font_file, float font_height)
+gui_init_begin(GuiContext *gui, GpuContext *gpu)
 {
-  assert(gui && !gui->vertex_buffer && gc && gc->device);
+  assert(gui && !gui->vertex_buffer && gpu && gpu->device);
 
-  nk_init_default(&gui->ctx, NULL);
+  nk_init_default(&gui->nkctx, NULL);
   nk_buffer_init_default(&gui->cmds);
 
-  VHR(ID3D12Device14_CreateCommittedResource3(gc->device,
+  VHR(ID3D12Device14_CreateCommittedResource3(gpu->device,
     &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
     D3D12_HEAP_FLAG_NONE,
     &(D3D12_RESOURCE_DESC1){
@@ -29,7 +29,7 @@ gui_init(GuiState *gui, GpuContext *gc, const char *font_file, float font_height
     D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, NULL, 0, NULL,
     &IID_ID3D12Resource, &gui->vertex_buffer));
 
-  VHR(ID3D12Device14_CreateCommittedResource3(gc->device,
+  VHR(ID3D12Device14_CreateCommittedResource3(gpu->device,
     &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
     D3D12_HEAP_FLAG_NONE,
     &(D3D12_RESOURCE_DESC1){
@@ -49,107 +49,110 @@ gui_init(GuiState *gui, GpuContext *gc, const char *font_file, float font_height
   gui->index_buffer_addr = ID3D12Resource_GetGPUVirtualAddress(
     gui->index_buffer);
 
-  {
-    nk_font_atlas_init_default(&gui->atlas);
-    nk_font_atlas_begin(&gui->atlas);
+  nk_font_atlas_init_default(&gui->atlas);
+  nk_font_atlas_begin(&gui->atlas);
+}
 
-    struct nk_font *font = nk_font_atlas_add_from_file(&gui->atlas, font_file, 
-      font_height, 0);
-
-    VHR(ID3D12CommandAllocator_Reset(gc->command_allocators[0]));
-    VHR(ID3D12GraphicsCommandList10_Reset(gc->command_list,
-      gc->command_allocators[0], NULL));
-
-    {
-      int font_w, font_h;
-      const void *font_image = nk_font_atlas_bake(&gui->atlas,
-        &font_w, &font_h, NK_FONT_ATLAS_RGBA32);
-      assert(font_image);
-      LOG("[gui] Font texture dimension: %d x %d\n", font_w, font_h);
-
-      VHR(ID3D12Device14_CreateCommittedResource3(gc->device,
-        &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
-        D3D12_HEAP_FLAG_NONE,
-        &(D3D12_RESOURCE_DESC1){
-          .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-          .Width = font_w,
-          .Height = font_h,
-          .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
-          .DepthOrArraySize = 1,
-          .MipLevels = 1,
-          .SampleDesc = { .Count = 1 },
-        },
-        D3D12_BARRIER_LAYOUT_COPY_DEST, NULL, NULL, 0, NULL,
-        &IID_ID3D12Resource, &gui->font_texture));
-
-      ID3D12Device14_CreateShaderResourceView(gc->device,
-        gui->font_texture, NULL,
-        (D3D12_CPU_DESCRIPTOR_HANDLE){
-          .ptr = gc->shader_dheap_start_cpu.ptr + RDH_GUI_TEXTURE
-            * gc->shader_dheap_descriptor_size
-        });
-
-      D3D12_RESOURCE_DESC desc = {0};
-      D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout = {0};
-      uint64_t required_size = {0};
-
-      ID3D12Resource_GetDesc(gui->font_texture, &desc);
-      ID3D12Device14_GetCopyableFootprints(gc->device, &desc, 0, 1, 0, &layout,
-        NULL, NULL, &required_size);
-
-      GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gc,
-        (uint32_t)required_size);
-      layout.Offset = upload.buffer_offset;
-
-      for (uint32_t y = 0; y < layout.Footprint.Height; ++y) {
-        memcpy(upload.cpu_addr + y * layout.Footprint.RowPitch,
-          (uint8_t *)font_image + y * (font_w * 4), font_w * 4);
-      }
-
-      ID3D12GraphicsCommandList10_CopyTextureRegion(gc->command_list,
-        &(D3D12_TEXTURE_COPY_LOCATION){
-          .pResource = gui->font_texture,
-          .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
-          .SubresourceIndex = 0,
-        },
-        0, 0, 0,
-        &(D3D12_TEXTURE_COPY_LOCATION){
-          .pResource = upload.buffer,
-          .Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
-          .PlacedFootprint = layout,
-        },
-        NULL);
-
-      ID3D12GraphicsCommandList10_Barrier(gc->command_list, 1,
-        &(D3D12_BARRIER_GROUP){
-          .Type = D3D12_BARRIER_TYPE_TEXTURE,
-          .NumBarriers = 1,
-          .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
-            .SyncBefore = D3D12_BARRIER_SYNC_COPY,
-            .SyncAfter = D3D12_BARRIER_SYNC_NONE,
-            .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
-            .AccessAfter = D3D12_BARRIER_ACCESS_NO_ACCESS,
-            .LayoutBefore = D3D12_BARRIER_LAYOUT_COPY_DEST,
-            .LayoutAfter = D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-            .pResource = gui->font_texture,
-          },
-        });
-    }
-
-    VHR(ID3D12GraphicsCommandList10_Close(gc->command_list));
-    ID3D12CommandQueue_ExecuteCommandLists(gc->command_queue, 1,
-      (ID3D12CommandList **)&gc->command_list);
-    gpu_finish_commands(gc);
-
-    nk_font_atlas_end(&gui->atlas, nk_handle_id(0),
-      &gui->tex_null);
-
-    nk_style_set_font(&gui->ctx, &font->handle);
-  }
+struct nk_font *
+gui_init_add_font(GuiContext *gui, const char *font_file, float font_height)
+{
+  return nk_font_atlas_add_from_file(&gui->atlas, font_file, font_height, NULL);
 }
 
 void
-gui_deinit(GuiState *gui)
+gui_init_end(GuiContext *gui, GpuContext *gpu)
+{
+  VHR(ID3D12CommandAllocator_Reset(gpu->command_allocators[0]));
+  VHR(ID3D12GraphicsCommandList10_Reset(gpu->command_list,
+    gpu->command_allocators[0], NULL));
+
+  {
+    int font_w, font_h;
+    const void *font_image = nk_font_atlas_bake(&gui->atlas, &font_w, &font_h, 
+      NK_FONT_ATLAS_RGBA32);
+    assert(font_image);
+    LOG("[gui] Font texture dimension: %d x %d", font_w, font_h);
+
+    VHR(ID3D12Device14_CreateCommittedResource3(gpu->device,
+      &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
+      D3D12_HEAP_FLAG_NONE,
+      &(D3D12_RESOURCE_DESC1){
+        .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+        .Width = font_w,
+        .Height = font_h,
+        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+        .DepthOrArraySize = 1,
+        .MipLevels = 1,
+        .SampleDesc = { .Count = 1 },
+      },
+      D3D12_BARRIER_LAYOUT_COPY_DEST, NULL, NULL, 0, NULL,
+      &IID_ID3D12Resource, &gui->font_texture));
+
+    ID3D12Device14_CreateShaderResourceView(gpu->device,
+      gui->font_texture, NULL,
+      (D3D12_CPU_DESCRIPTOR_HANDLE){
+        .ptr = gpu->shader_dheap_start_cpu.ptr + RDH_GUI_TEXTURE
+          * gpu->shader_dheap_descriptor_size
+      });
+
+    D3D12_RESOURCE_DESC desc = {0};
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout = {0};
+    uint64_t required_size = {0};
+
+    ID3D12Resource_GetDesc(gui->font_texture, &desc);
+    ID3D12Device14_GetCopyableFootprints(gpu->device, &desc, 0, 1, 0, &layout,
+      NULL, NULL, &required_size);
+
+    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
+      (uint32_t)required_size);
+    layout.Offset = upload.buffer_offset;
+
+    for (uint32_t y = 0; y < layout.Footprint.Height; ++y) {
+      memcpy(upload.cpu_addr + y * layout.Footprint.RowPitch,
+        (uint8_t *)font_image + y * (font_w * 4), font_w * 4);
+    }
+
+    ID3D12GraphicsCommandList10_CopyTextureRegion(gpu->command_list,
+      &(D3D12_TEXTURE_COPY_LOCATION){
+        .pResource = gui->font_texture,
+        .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+        .SubresourceIndex = 0,
+      },
+      0, 0, 0,
+      &(D3D12_TEXTURE_COPY_LOCATION){
+        .pResource = upload.buffer,
+        .Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+        .PlacedFootprint = layout,
+      },
+      NULL);
+
+    ID3D12GraphicsCommandList10_Barrier(gpu->command_list, 1,
+      &(D3D12_BARRIER_GROUP){
+        .Type = D3D12_BARRIER_TYPE_TEXTURE,
+        .NumBarriers = 1,
+        .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+          .SyncBefore = D3D12_BARRIER_SYNC_COPY,
+          .SyncAfter = D3D12_BARRIER_SYNC_NONE,
+          .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
+          .AccessAfter = D3D12_BARRIER_ACCESS_NO_ACCESS,
+          .LayoutBefore = D3D12_BARRIER_LAYOUT_COPY_DEST,
+          .LayoutAfter = D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+          .pResource = gui->font_texture,
+        },
+      });
+  }
+
+  VHR(ID3D12GraphicsCommandList10_Close(gpu->command_list));
+  ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
+    (ID3D12CommandList **)&gpu->command_list);
+  gpu_finish_commands(gpu);
+
+  nk_font_atlas_end(&gui->atlas, nk_handle_id(0),
+    &gui->tex_null);
+}
+
+void
+gui_deinit(GuiContext *gui)
 {
   assert(gui && gui->vertex_buffer);
 
@@ -159,22 +162,22 @@ gui_deinit(GuiState *gui)
 
   nk_font_atlas_clear(&gui->atlas);
   nk_buffer_free(&gui->cmds);
-  nk_free(&gui->ctx);
+  nk_free(&gui->nkctx);
 
   memset(gui, 0, sizeof(*gui));
 }
 
 void
-gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
+gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
   ID3D12RootSignature *pso_rs)
 {
-  ID3D12GraphicsCommandList10 *cmdlist = gc->command_list;
+  ID3D12GraphicsCommandList10 *cmdlist = gpu->command_list;
 
-  GpuUploadBufferRegion upload_vb = gpu_alloc_upload_memory(gc,
+  GpuUploadBufferRegion upload_vb = gpu_alloc_upload_memory(gpu,
     MAX_VERTEX_BUFFER);
-  GpuUploadBufferRegion upload_ib = gpu_alloc_upload_memory(gc,
+  GpuUploadBufferRegion upload_ib = gpu_alloc_upload_memory(gpu,
     MAX_INDEX_BUFFER);
-  GpuUploadBufferRegion upload_cb = gpu_alloc_upload_memory(gc,
+  GpuUploadBufferRegion upload_cb = gpu_alloc_upload_memory(gpu,
     sizeof(float) * 4 * 4);
 
   ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmdlist, pso_rs);
@@ -182,9 +185,9 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
 
   {
     float l = 0.0f;
-    float r = (float)gc->viewport_width;
+    float r = (float)gpu->viewport_width;
     float t = 0.0f;
-    float b = (float)gc->viewport_height;
+    float b = (float)gpu->viewport_height;
     memcpy(upload_cb.cpu_addr,
       (float[]){
         2.0f / (r - l),    0.0f,              0.0f, 0.0f,
@@ -203,7 +206,7 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
     nk_buffer_init_fixed(&vbuf, upload_vb.cpu_addr, MAX_VERTEX_BUFFER);
     nk_buffer_init_fixed(&ibuf, upload_ib.cpu_addr, MAX_INDEX_BUFFER);
 
-    nk_convert(&gui->ctx, &gui->cmds, &vbuf, &ibuf,
+    nk_convert(&gui->nkctx, &gui->cmds, &vbuf, &ibuf,
       &(struct nk_convert_config){
         .vertex_layout = (struct nk_draw_vertex_layout_element[]){
           { NK_VERTEX_POSITION, NK_FORMAT_FLOAT, NK_OFFSETOF(GuiVertex, pos) },
@@ -228,7 +231,7 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
   ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->index_buffer, 0, 
     upload_ib.buffer, upload_ib.buffer_offset, MAX_INDEX_BUFFER);
 
-  ID3D12GraphicsCommandList10_Barrier(gc->command_list, 1,
+  ID3D12GraphicsCommandList10_Barrier(gpu->command_list, 1,
     &(D3D12_BARRIER_GROUP){
       .Type = D3D12_BARRIER_TYPE_BUFFER,
       .NumBarriers = 2,
@@ -254,8 +257,8 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
     &(D3D12_VIEWPORT){
       .TopLeftX = 0.0f,
       .TopLeftY = 0.0f,
-      .Width = (float)gc->viewport_width,
-      .Height = (float)gc->viewport_height,
+      .Width = (float)gpu->viewport_width,
+      .Height = (float)gpu->viewport_height,
       .MinDepth = 0.0f,
       .MaxDepth = 1.0f,
     });
@@ -276,7 +279,7 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
   UINT draw_offset = 0;
   const struct nk_draw_command *cmd;
 
-  nk_draw_foreach(cmd, &gui->ctx, &gui->cmds) {
+  nk_draw_foreach(cmd, &gui->nkctx, &gui->cmds) {
     if (cmd->elem_count) {
       ID3D12GraphicsCommandList10_RSSetScissorRects(cmdlist, 1,
         &(D3D12_RECT){
@@ -293,7 +296,7 @@ gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
     }
   }
 
-  nk_clear(&gui->ctx);
+  nk_clear(&gui->nkctx);
   nk_buffer_clear(&gui->cmds);
 }
 

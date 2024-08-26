@@ -9,9 +9,9 @@ typedef struct GuiVertex
   uint8_t col[4];
 } GuiVertex;
 
-typedef struct GuiState
+typedef struct GuiContext
 {
-  struct nk_context ctx;
+  struct nk_context nkctx;
   struct nk_font_atlas atlas;
   struct nk_buffer cmds;
   struct nk_draw_null_texture tex_null;
@@ -22,12 +22,18 @@ typedef struct GuiState
 
   D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer_addr;
   D3D12_GPU_VIRTUAL_ADDRESS index_buffer_addr;
-} GuiState;
+} GuiContext;
 
-void gui_init(GuiState *gui, GpuContext *gc, const char *font_file,
+void gui_init_begin(GuiContext *gui, GpuContext *gpu);
+void gui_init_end(GuiContext *gui, GpuContext *gpu);
+
+struct nk_font *gui_init_add_font(GuiContext *gui, const char *font_file,
   float font_height);
-void gui_deinit(GuiState *gui);
-void gui_draw(GuiState *gui, GpuContext *gc, ID3D12PipelineState *pso,
+
+void gui_deinit(GuiContext *gui);
+
+void gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
   ID3D12RootSignature *pso_rs);
+
 bool gui_handle_event(struct nk_context *ctx, HWND wnd, UINT msg, WPARAM wparam,
   LPARAM lparam);

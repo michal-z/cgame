@@ -89,9 +89,9 @@ typedef struct GpuUploadBufferRegion
   uint64_t buffer_offset;
 } GpuUploadBufferRegion;
 
-void gpu_init_context(GpuContext *gc, HWND window);
-void gpu_deinit_context(GpuContext *gc);
-GpuContextState gpu_update_context(GpuContext *gc);
-void gpu_finish_commands(GpuContext *gc);
-void gpu_present_frame(GpuContext *gc);
-GpuUploadBufferRegion gpu_alloc_upload_memory(GpuContext *gc, uint32_t size);
+void gpu_init_context(GpuContext *gpu, HWND window);
+void gpu_deinit_context(GpuContext *gpu);
+GpuContextState gpu_update_context(GpuContext *gpu);
+void gpu_finish_commands(GpuContext *gpu);
+void gpu_present_frame(GpuContext *gpu);
+GpuUploadBufferRegion gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size);

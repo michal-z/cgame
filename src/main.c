@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "gpu_context.h"
+#include "gpu.h"
 #include "cpu_gpu_common.h"
 #include "shaders.h"
 #include "gui.h"
@@ -65,7 +65,6 @@ process_window_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       }
       break;
   }
-
   return DefWindowProcA(hwnd, message, wparam, lparam);
 }
 
@@ -97,16 +96,22 @@ create_window(const char *name, int32_t width, int32_t height)
 #define PSO_FIRST 0
 #define PSO_GUI 1
 #define PSO_MAX 16
+
 #define STATIC_GEO_BUFFER_SIZE (16 * 1024 * 1024)
+
+#define FONT_ROBOTO_16 0
+#define FONT_ROBOTO_24 1
+#define FONT_MAX 4
 
 typedef struct GameState
 {
   const char *name;
   GpuContext gpu_context;
-  GuiState gui;
+  GuiContext gui_context;
   ID3D12RootSignature *pso_rs[PSO_MAX];
   ID3D12PipelineState *pso[PSO_MAX];
   ID3D12Resource *static_geo_buffer;
+  struct nk_font *fonts[FONT_MAX];
 } GameState;
 
 static void
@@ -114,23 +119,33 @@ game_init(GameState *game_state)
 {
   assert(game_state && game_state->name != NULL);
 
-  HWND window = create_window(game_state->name, 1600, 1200);
+  float dpi_scale = GetDpiForSystem() / (float)USER_DEFAULT_SCREEN_DPI;
+  HWND window = create_window(game_state->name, (int32_t)(1280 * dpi_scale),
+    (int32_t)(720 * dpi_scale));
 
   gpu_init_context(&game_state->gpu_context, window);
 
-  GpuContext *gc = &game_state->gpu_context;
+  GpuContext *gpu = &game_state->gpu_context;
+  GuiContext *gui = &game_state->gui_context;
 
-  gui_init(&game_state->gui, gc, "assets/fonts/Roboto-Regular.ttf", 64.0f);
+  gui_init_begin(gui, gpu);
+  game_state->fonts[FONT_ROBOTO_16] = gui_init_add_font(gui,
+    "assets/fonts/Roboto-Regular.ttf", 16.0f * dpi_scale);
+  game_state->fonts[FONT_ROBOTO_24] = gui_init_add_font(gui,
+    "assets/fonts/Roboto-Regular.ttf", 24.0f * dpi_scale);
+  gui_init_end(gui, gpu);
+
+  nk_style_set_font(&gui->nkctx, &game_state->fonts[FONT_ROBOTO_16]->handle);
 
   //
   // PSO_FIRST
   //
-  VHR(ID3D12Device14_CreateRootSignature(gc->device, 0,
+  VHR(ID3D12Device14_CreateRootSignature(gpu->device, 0,
     g_pso_bytecode[PSO_FIRST].vs.pShaderBytecode,
     g_pso_bytecode[PSO_FIRST].vs.BytecodeLength, &IID_ID3D12RootSignature,
     &game_state->pso_rs[PSO_FIRST]));
 
-  VHR(ID3D12Device14_CreateGraphicsPipelineState(gc->device,
+  VHR(ID3D12Device14_CreateGraphicsPipelineState(gpu->device,
     &(D3D12_GRAPHICS_PIPELINE_STATE_DESC){
       .VS = g_pso_bytecode[PSO_FIRST].vs,
       .PS = g_pso_bytecode[PSO_FIRST].ps,
@@ -156,12 +171,12 @@ game_init(GameState *game_state)
   //
   // PSO_GUI
   //
-  VHR(ID3D12Device14_CreateRootSignature(gc->device, 0,
+  VHR(ID3D12Device14_CreateRootSignature(gpu->device, 0,
     g_pso_bytecode[PSO_GUI].vs.pShaderBytecode,
     g_pso_bytecode[PSO_GUI].vs.BytecodeLength, &IID_ID3D12RootSignature,
     &game_state->pso_rs[PSO_GUI]));
 
-  VHR(ID3D12Device14_CreateGraphicsPipelineState(gc->device,
+  VHR(ID3D12Device14_CreateGraphicsPipelineState(gpu->device,
     &(D3D12_GRAPHICS_PIPELINE_STATE_DESC){
       .VS = g_pso_bytecode[PSO_GUI].vs,
       .PS = g_pso_bytecode[PSO_GUI].ps,
@@ -209,7 +224,7 @@ game_init(GameState *game_state)
   //
   // Static geometry buffer
   //
-  VHR(ID3D12Device14_CreateCommittedResource3(gc->device,
+  VHR(ID3D12Device14_CreateCommittedResource3(gpu->device,
     &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
     D3D12_HEAP_FLAG_NONE,
     &(D3D12_RESOURCE_DESC1){
@@ -224,7 +239,7 @@ game_init(GameState *game_state)
     D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, NULL, 0, NULL,
     &IID_ID3D12Resource, &game_state->static_geo_buffer));
 
-  ID3D12Device14_CreateShaderResourceView(gc->device,
+  ID3D12Device14_CreateShaderResourceView(gpu->device,
     game_state->static_geo_buffer,
     &(D3D12_SHADER_RESOURCE_VIEW_DESC){
       .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
@@ -236,12 +251,12 @@ game_init(GameState *game_state)
       },
     },
     (D3D12_CPU_DESCRIPTOR_HANDLE){
-      .ptr = gc->shader_dheap_start_cpu.ptr + RDH_STATIC_GEO_BUFFER
-        * gc->shader_dheap_descriptor_size
+      .ptr = gpu->shader_dheap_start_cpu.ptr + RDH_STATIC_GEO_BUFFER
+        * gpu->shader_dheap_descriptor_size
     });
 
   {
-    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gc, 3 *
+    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu, 3 *
       sizeof(Vertex));
     {
       Vertex *v = (Vertex *)upload.cpu_addr;
@@ -250,29 +265,29 @@ game_init(GameState *game_state)
       *v++ = (Vertex){ .x =  0.8f, .y = -0.7f };
     }
 
-    VHR(ID3D12CommandAllocator_Reset(gc->command_allocators[0]));
-    VHR(ID3D12GraphicsCommandList10_Reset(gc->command_list,
-      gc->command_allocators[0], NULL));
+    VHR(ID3D12CommandAllocator_Reset(gpu->command_allocators[0]));
+    VHR(ID3D12GraphicsCommandList10_Reset(gpu->command_list,
+      gpu->command_allocators[0], NULL));
 
-    ID3D12GraphicsCommandList10_CopyBufferRegion(gc->command_list,
+    ID3D12GraphicsCommandList10_CopyBufferRegion(gpu->command_list,
       game_state->static_geo_buffer, 0, upload.buffer, upload.buffer_offset,
       3 * sizeof(Vertex));
 
-    VHR(ID3D12GraphicsCommandList10_Close(gc->command_list));
-    ID3D12CommandQueue_ExecuteCommandLists(gc->command_queue, 1,
-      (ID3D12CommandList **)&gc->command_list);
-    gpu_finish_commands(gc);
+    VHR(ID3D12GraphicsCommandList10_Close(gpu->command_list));
+    ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
+      (ID3D12CommandList **)&gpu->command_list);
+    gpu_finish_commands(gpu);
   }
 }
 
 static void
 game_deinit(GameState *game_state)
 {
-  GpuContext *gc = &game_state->gpu_context;
+  GpuContext *gpu = &game_state->gpu_context;
 
-  gpu_finish_commands(gc);
+  gpu_finish_commands(gpu);
 
-  gui_deinit(&game_state->gui);
+  gui_deinit(&game_state->gui_context);
 
   SAFE_RELEASE(game_state->static_geo_buffer);
   for (uint32_t i = 0; i < PSO_MAX; ++i) {
@@ -280,17 +295,17 @@ game_deinit(GameState *game_state)
     SAFE_RELEASE(game_state->pso_rs[i]);
   }
 
-  gpu_deinit_context(gc);
+  gpu_deinit_context(gpu);
 }
 
 static bool
 game_update(GameState *game_state)
 {
-  GpuContext *gc = &game_state->gpu_context;
+  GpuContext *gpu = &game_state->gpu_context;
 
-  update_frame_stats(gc->window, game_state->name);
+  update_frame_stats(gpu->window, game_state->name);
 
-  GpuContextState gpu_ctx_state = gpu_update_context(gc);
+  GpuContextState gpu_ctx_state = gpu_update_context(gpu);
 
   if (gpu_ctx_state == GpuContextState_WindowMinimized)
     return false;
@@ -301,48 +316,27 @@ game_update(GameState *game_state)
     // ...
   }
 
-  struct nk_context *ctx = &game_state->gui.ctx;
-  struct nk_colorf bg;
+  float scale = GetDpiForWindow(gpu->window) / (float)USER_DEFAULT_SCREEN_DPI;
+  GuiContext *gui = &game_state->gui_context;
+  struct nk_context *nkctx = &gui->nkctx;
 
-  bg.r = 0.10f, bg.g = 0.18f, bg.b = 0.24f, bg.a = 1.0f;
-
-  /* GUI */
-  if (nk_begin(ctx, "Demo", nk_rect(50, 50, 2*230, 2*250),
-    NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_SCALABLE|
-    NK_WINDOW_MINIMIZABLE|NK_WINDOW_TITLE))
+  if (nk_begin(nkctx, "Demo", nk_rect(0, 0, scale * 200.0f, scale * 300.0f),
+    NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE |
+    NK_WINDOW_MINIMIZABLE | NK_WINDOW_TITLE))
   {
-    enum {EASY, HARD};
-    static int op = EASY;
-    static int property = 20;
+    nk_style_set_font(nkctx, &game_state->fonts[FONT_ROBOTO_16]->handle);
 
-    nk_layout_row_static(ctx, 120.0f, 400, 1);
-    if (nk_button_label(ctx, "Click me!"))
-      fprintf(stdout, "button pressed\n");
+    nk_layout_row_dynamic(nkctx, 0.0f, 1);
+    if (nk_button_label(nkctx, "Click me!"))
+      LOG("[test] button pressed");
 
-#if 0
-    nk_layout_row_dynamic(ctx, 30, 2);
-    if (nk_option_label(ctx, "easy", op == EASY)) op = EASY;
-    if (nk_option_label(ctx, "hard", op == HARD)) op = HARD;
-    nk_layout_row_dynamic(ctx, 22, 1);
-    nk_property_int(ctx, "Compression:", 0, &property, 100, 10, 1);
+    nk_style_set_font(nkctx, &game_state->fonts[FONT_ROBOTO_24]->handle);
 
-    nk_layout_row_dynamic(ctx, 20, 1);
-    nk_label(ctx, "background:", NK_TEXT_LEFT);
-    nk_layout_row_dynamic(ctx, 25, 1);
-
-    if (nk_combo_begin_color(ctx, nk_rgb_cf(bg), nk_vec2(nk_widget_width(ctx),400))) {
-      nk_layout_row_dynamic(ctx, 120, 1);
-      bg = nk_color_picker(ctx, bg, NK_RGBA);
-      nk_layout_row_dynamic(ctx, 25, 1);
-      bg.r = nk_propertyf(ctx, "#R:", 0, bg.r, 1.0f, 0.01f,0.005f);
-      bg.g = nk_propertyf(ctx, "#G:", 0, bg.g, 1.0f, 0.01f,0.005f);
-      bg.b = nk_propertyf(ctx, "#B:", 0, bg.b, 1.0f, 0.01f,0.005f);
-      bg.a = nk_propertyf(ctx, "#A:", 0, bg.a, 1.0f, 0.01f,0.005f);
-      nk_combo_end(ctx);
-    }
-#endif
+    nk_layout_row_dynamic(nkctx, 0.0f, 1);
+    if (nk_button_label(nkctx, "Click me!"))
+      LOG("[test] button pressed");
   }
-  nk_end(ctx);
+  nk_end(nkctx);
 
   return true;
 }
@@ -350,21 +344,21 @@ game_update(GameState *game_state)
 static void
 game_draw(GameState *game_state)
 {
-  GpuContext *gc = &game_state->gpu_context;
-  ID3D12CommandAllocator *cmdalloc = gc->command_allocators[gc->frame_index];
-  ID3D12GraphicsCommandList10 *cmdlist = gc->command_list;
+  GpuContext *gpu = &game_state->gpu_context;
+  ID3D12CommandAllocator *cmdalloc = gpu->command_allocators[gpu->frame_index];
+  ID3D12GraphicsCommandList10 *cmdlist = gpu->command_list;
 
   VHR(ID3D12CommandAllocator_Reset(cmdalloc));
   VHR(ID3D12GraphicsCommandList10_Reset(cmdlist, cmdalloc, NULL));
 
-  ID3D12GraphicsCommandList10_SetDescriptorHeaps(cmdlist, 1, &gc->shader_dheap);
+  ID3D12GraphicsCommandList10_SetDescriptorHeaps(cmdlist, 1, &gpu->shader_dheap);
 
   ID3D12GraphicsCommandList10_RSSetViewports(cmdlist, 1,
     &(D3D12_VIEWPORT){
       .TopLeftX = 0.0f,
       .TopLeftY = 0.0f,
-      .Width = (float)gc->viewport_width,
-      .Height = (float)gc->viewport_height,
+      .Width = (float)gpu->viewport_width,
+      .Height = (float)gpu->viewport_height,
       .MinDepth = 0.0f,
       .MaxDepth = 1.0f,
     });
@@ -373,13 +367,13 @@ game_draw(GameState *game_state)
     &(D3D12_RECT){
       .left = 0,
       .top = 0,
-      .right = gc->viewport_width,
-      .bottom = gc->viewport_height,
+      .right = gpu->viewport_width,
+      .bottom = gpu->viewport_height,
     });
 
   D3D12_CPU_DESCRIPTOR_HANDLE rt_descriptor = {
-    .ptr = gc->rtv_dheap_start.ptr + gc->frame_index *
-      gc->rtv_dheap_descriptor_size
+    .ptr = gpu->rtv_dheap_start.ptr + gpu->frame_index *
+      gpu->rtv_dheap_descriptor_size
   };
 
   ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
@@ -393,7 +387,7 @@ game_draw(GameState *game_state)
         .AccessAfter = D3D12_BARRIER_ACCESS_RENDER_TARGET,
         .LayoutBefore = D3D12_BARRIER_LAYOUT_PRESENT,
         .LayoutAfter = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        .pResource = gc->swap_chain_buffers[gc->frame_index],
+        .pResource = gpu->swap_chain_buffers[gpu->frame_index],
       },
     });
 
@@ -411,7 +405,7 @@ game_draw(GameState *game_state)
     game_state->pso[PSO_FIRST]);
   ID3D12GraphicsCommandList10_DrawInstanced(cmdlist, 3, 1, 0, 0);
 
-  gui_draw(&game_state->gui, gc, game_state->pso[PSO_GUI],
+  gui_draw(&game_state->gui_context, gpu, game_state->pso[PSO_GUI],
     game_state->pso_rs[PSO_GUI]);
 
   ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
@@ -425,16 +419,16 @@ game_draw(GameState *game_state)
         .AccessAfter = D3D12_BARRIER_ACCESS_NO_ACCESS,
         .LayoutBefore = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         .LayoutAfter = D3D12_BARRIER_LAYOUT_PRESENT,
-        .pResource = gc->swap_chain_buffers[gc->frame_index],
+        .pResource = gpu->swap_chain_buffers[gpu->frame_index],
       },
     });
 
   VHR(ID3D12GraphicsCommandList10_Close(cmdlist));
 
-  ID3D12CommandQueue_ExecuteCommandLists(gc->command_queue, 1,
+  ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
     (ID3D12CommandList **)&cmdlist);
 
-  gpu_present_frame(gc);
+  gpu_present_frame(gpu);
 }
 
 int
@@ -442,16 +436,19 @@ main(void)
 {
   SetProcessDPIAware();
 
+  {
+    UINT dpi = GetDpiForSystem();
+    LOG("[system] DPI: %d Scale: %f", dpi, (float)dpi /
+      USER_DEFAULT_SCREEN_DPI);
+  }
+
   GameState game_state = { .name = "cgame" };
   game_init(&game_state);
-
-  //UINT dpi = GetDpiForWindow(game_state.gpu_context.window);
-  //printf("DPI: %d Scale: %f\n", dpi, (float)dpi / USER_DEFAULT_SCREEN_DPI);
 
   bool running = true;
 
   while (running) {
-    nk_input_begin(&game_state.gui.ctx);
+    nk_input_begin(&game_state.gui_context.nkctx);
 
     MSG msg = {0};
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -460,10 +457,10 @@ main(void)
       TranslateMessage(&msg);
       DispatchMessage(&msg);
 
-      gui_handle_event(&game_state.gui.ctx, msg.hwnd, msg.message, msg.wParam,
-        msg.lParam);
+      gui_handle_event(&game_state.gui_context.nkctx, msg.hwnd, msg.message,
+        msg.wParam, msg.lParam);
     }
-    nk_input_end(&game_state.gui.ctx);
+    nk_input_end(&game_state.gui_context.nkctx);
 
     if (game_update(&game_state)) game_draw(&game_state);
   }
