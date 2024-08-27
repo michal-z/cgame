@@ -58,7 +58,7 @@ void s01_ps(float4 position : SV_Position,
   out float4 out_color : SV_Target0)
 {
   Texture2D tex = ResourceDescriptorHeap[RDH_GUI_TEXTURE];
-  out_color = color * tex.Sample(g_sampler0, uv);
+  out_color = pow(color * tex.Sample(g_sampler0, uv), 2.2f);
 }
 
 #endif

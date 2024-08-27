@@ -312,7 +312,7 @@ gui_handle_event(GuiContext *gui, HWND wnd, UINT msg, WPARAM wparam,
   switch (msg) {
     case WM_DPICHANGED: {
       // We should re-create all resources that depend on DPI here (fonts)
-      LOG("[gui] Dpi changed (we don't support this case for now)");
+      LOG("[gui] DPI changed (we don't support this case for now)");
       return false;
     }
     case WM_KEYDOWN:
