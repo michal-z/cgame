@@ -1,15 +1,17 @@
 #pragma once
 
 typedef struct GpuContext GpuContext;
+typedef struct GuiVertex GuiVertex;
+typedef struct GuiContext GuiContext;
 
-typedef struct GuiVertex
+struct GuiVertex
 {
   float pos[2];
   float uv[2];
   uint8_t col[4];
-} GuiVertex;
+};
 
-typedef struct GuiContext
+struct GuiContext
 {
   struct nk_context nkctx;
   struct nk_font_atlas atlas;
@@ -22,7 +24,7 @@ typedef struct GuiContext
 
   D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer_addr;
   D3D12_GPU_VIRTUAL_ADDRESS index_buffer_addr;
-} GuiContext;
+};
 
 void gui_init_begin(GuiContext *gui, GpuContext *gpu);
 void gui_init_end(GuiContext *gui, GpuContext *gpu);

@@ -23,7 +23,7 @@ get_time(void)
 }
 
 static float
-update_frame_stats(HWND window, const char *name)
+window_update_frame_stats(HWND window, const char *name)
 {
   static double previous_time = -1.0;
   static double header_refresh_time = 0.0;
@@ -52,7 +52,7 @@ update_frame_stats(HWND window, const char *name)
 }
 
 static LRESULT CALLBACK
-process_window_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
   switch (message) {
     case WM_DESTROY:
@@ -65,17 +65,23 @@ process_window_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       }
       break;
   }
+
+  GuiContext *gui = (GuiContext *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+  if (gui)
+    if (gui_handle_event(gui, hwnd, message, wparam, lparam))
+      return 0;
+
   return DefWindowProcA(hwnd, message, wparam, lparam);
 }
 
 static HWND
-create_window(const char *name, int32_t width, int32_t height)
+window_create(const char *name, int32_t width, int32_t height)
 {
   RegisterClass(
     &(WNDCLASSA){
-      .lpfnWndProc = process_window_message,
-      .hInstance = GetModuleHandleA(NULL),
-      .hCursor = LoadCursorA(NULL, IDC_ARROW),
+      .lpfnWndProc = window_handle_event,
+      .hInstance = GetModuleHandle(NULL),
+      .hCursor = LoadCursor(NULL, IDC_ARROW),
       .lpszClassName = name,
     });
 
@@ -120,7 +126,7 @@ game_init(GameState *game_state)
   assert(game_state && game_state->name != NULL);
 
   float dpi_scale = GetDpiForSystem() / (float)USER_DEFAULT_SCREEN_DPI;
-  HWND window = create_window(game_state->name, (int32_t)(1280 * dpi_scale),
+  HWND window = window_create(game_state->name, (int32_t)(1280 * dpi_scale),
     (int32_t)(720 * dpi_scale));
 
   gpu_init_context(&game_state->gpu_context, window);
@@ -303,7 +309,7 @@ game_update(GameState *game_state)
 {
   GpuContext *gpu = &game_state->gpu_context;
 
-  update_frame_stats(gpu->window, game_state->name);
+  window_update_frame_stats(gpu->window, game_state->name);
 
   GpuContextState gpu_ctx_state = gpu_update_context(gpu);
 
@@ -438,8 +444,7 @@ main(void)
 
   {
     UINT dpi = GetDpiForSystem();
-    LOG("[system] DPI: %d Scale: %f", dpi, (float)dpi /
-      USER_DEFAULT_SCREEN_DPI);
+    LOG("[system] DPI: %d Scale: %f", dpi, (float)dpi / USER_DEFAULT_SCREEN_DPI);
   }
 
   GameState game_state = { .name = "cgame" };
@@ -451,13 +456,10 @@ main(void)
     MSG msg = {0};
     nk_input_begin(&game_state.gui_context.nkctx);
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-      if (msg.message == WM_QUIT) running = false;
-
+      if (msg.message == WM_QUIT)
+        running = false;
       TranslateMessage(&msg);
       DispatchMessage(&msg);
-
-      gui_handle_event(&game_state.gui_context, msg.hwnd, msg.message, msg.wParam,
-        msg.lParam);
     }
     nk_input_end(&game_state.gui_context.nkctx);
 

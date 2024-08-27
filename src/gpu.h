@@ -16,16 +16,30 @@
 
 #define GPU_UPLOAD_HEAP_CAPACITY (64 * 1024 * 1024)
 
-typedef struct GpuUploadMemoryHeap
+typedef struct GpuUploadMemoryHeap GpuUploadMemoryHeap;
+typedef struct GpuContext GpuContext;
+typedef struct GpuUploadBufferRegion GpuUploadBufferRegion;
+
+typedef enum GpuContextState GpuContextState;
+
+enum GpuContextState
+{
+  GpuContextState_Normal,
+  GpuContextState_WindowMinimized,
+  GpuContextState_WindowResized,
+  GpuContextState_DeviceLost,
+};
+
+struct GpuUploadMemoryHeap
 {
   ID3D12Resource *buffer;
   uint8_t *cpu_base_addr;
   D3D12_GPU_VIRTUAL_ADDRESS gpu_base_addr;
   uint32_t size;
   uint32_t capacity;
-} GpuUploadMemoryHeap;
+};
 
-typedef struct GpuContext
+struct GpuContext
 {
   HWND window;
   int32_t viewport_width;
@@ -71,23 +85,15 @@ typedef struct GpuContext
   uint32_t frame_index;
 
   GpuUploadMemoryHeap upload_heaps[GPU_MAX_BUFFERED_FRAMES];
-} GpuContext;
+};
 
-typedef enum GpuContextState
-{
-  GpuContextState_Normal,
-  GpuContextState_WindowMinimized,
-  GpuContextState_WindowResized,
-  GpuContextState_DeviceLost,
-} GpuContextState;
-
-typedef struct GpuUploadBufferRegion
+struct GpuUploadBufferRegion
 {
   uint8_t *cpu_addr;
   D3D12_GPU_VIRTUAL_ADDRESS gpu_addr;
   ID3D12Resource *buffer;
   uint64_t buffer_offset;
-} GpuUploadBufferRegion;
+};
 
 void gpu_init_context(GpuContext *gpu, HWND window);
 void gpu_deinit_context(GpuContext *gpu);

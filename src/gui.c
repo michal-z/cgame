@@ -51,6 +51,8 @@ gui_init_begin(GuiContext *gui, GpuContext *gpu)
 
   nk_font_atlas_init_default(&gui->atlas);
   nk_font_atlas_begin(&gui->atlas);
+
+  SetWindowLongPtr(gpu->window, GWLP_USERDATA, (LONG_PTR)gui);
 }
 
 struct nk_font *
