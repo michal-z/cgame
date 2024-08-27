@@ -24,6 +24,9 @@ struct GuiContext
 
   D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer_addr;
   D3D12_GPU_VIRTUAL_ADDRESS index_buffer_addr;
+
+  uint32_t dpi;
+  float dpi_scale_factor;
 };
 
 void gui_init_begin(GuiContext *gui, GpuContext *gpu);

@@ -127,9 +127,12 @@ game_init(GameState *game_state)
 {
   assert(game_state && game_state->name != NULL);
 
-  float dpi_scale = GetDpiForSystem() / (float)USER_DEFAULT_SCREEN_DPI;
-  HWND window = window_create(game_state->name, (int32_t)(1280 * dpi_scale),
-    (int32_t)(720 * dpi_scale));
+  HWND window = NULL;
+  {
+    float dpi_scale = GetDpiForSystem() / (float)USER_DEFAULT_SCREEN_DPI;
+    window = window_create(game_state->name, (int32_t)(1280 * dpi_scale),
+      (int32_t)(720 * dpi_scale));
+  }
 
   gpu_init_context(&game_state->gpu_context, window);
 
@@ -138,9 +141,9 @@ game_init(GameState *game_state)
 
   gui_init_begin(gui, gpu);
   game_state->fonts[FONT_ROBOTO_16] = gui_init_add_font(gui,
-    "assets/fonts/Roboto-Regular.ttf", 16.0f * dpi_scale);
+    "assets/fonts/Roboto-Regular.ttf", 16.0f * gui->dpi_scale_factor);
   game_state->fonts[FONT_ROBOTO_24] = gui_init_add_font(gui,
-    "assets/fonts/Roboto-Regular.ttf", 24.0f * dpi_scale);
+    "assets/fonts/Roboto-Regular.ttf", 24.0f * gui->dpi_scale_factor);
   gui_init_end(gui, gpu);
 
   nk_style_set_font(&gui->nkctx, &game_state->fonts[FONT_ROBOTO_16]->handle);

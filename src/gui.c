@@ -53,6 +53,8 @@ gui_init_begin(GuiContext *gui, GpuContext *gpu)
   nk_font_atlas_begin(&gui->atlas);
 
   SetWindowLongPtr(gpu->window, GWLP_USERDATA, (LONG_PTR)gui);
+  gui->dpi = GetDpiForWindow(gpu->window);
+  gui->dpi_scale_factor = (float)gui->dpi / USER_DEFAULT_SCREEN_DPI;
 }
 
 struct nk_font *
@@ -308,6 +310,10 @@ gui_handle_event(GuiContext *gui, HWND wnd, UINT msg, WPARAM wparam,
 {
   struct nk_context *ctx = &gui->nkctx;
   switch (msg) {
+    case WM_DPICHANGED: {
+      LOG("[gui] Dpi changed (we don't support this case for now)");
+      return false;
+    }
     case WM_KEYDOWN:
     case WM_KEYUP:
     case WM_SYSKEYDOWN:
