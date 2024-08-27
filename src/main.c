@@ -330,8 +330,8 @@ game_update(GameState *game_state)
     // ...
   }
 
-  float scale = GetDpiForWindow(gpu->window) / (float)USER_DEFAULT_SCREEN_DPI;
   GuiContext *gui = &game_state->gui_context;
+  float scale = gui->dpi_scale_factor;
   struct nk_context *nkctx = &gui->nkctx;
 
   if (nk_begin(nkctx, "Demo", nk_rect(10.0f * scale, 10.0f * scale,
