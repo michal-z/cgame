@@ -109,7 +109,9 @@ window_create(const char *name, int32_t width, int32_t height)
 #define FONT_ROBOTO_24 1
 #define FONT_MAX 4
 
-typedef struct GameState
+typedef struct GameState GameState;
+
+struct GameState
 {
   const char *name;
   GpuContext gpu_context;
@@ -118,7 +120,7 @@ typedef struct GameState
   ID3D12PipelineState *pso[PSO_MAX];
   ID3D12Resource *static_geo_buffer;
   struct nk_font *fonts[FONT_MAX];
-} GameState;
+};
 
 static void
 game_init(GameState *game_state)
