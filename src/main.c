@@ -129,7 +129,10 @@ game_init(GameState *game_state)
 
   HWND window = NULL;
   {
-    float dpi_scale = GetDpiForSystem() / (float)USER_DEFAULT_SCREEN_DPI;
+    UINT dpi = GetDpiForSystem();
+    float dpi_scale = dpi / (float)USER_DEFAULT_SCREEN_DPI;
+    LOG("[system] DPI: %d, DPI scale factor: %f", dpi, dpi_scale);
+
     window = window_create(game_state->name, (int32_t)(1280 * dpi_scale),
       (int32_t)(720 * dpi_scale));
   }
@@ -446,11 +449,6 @@ int
 main(void)
 {
   SetProcessDPIAware();
-
-  {
-    UINT dpi = GetDpiForSystem();
-    LOG("[system] DPI: %d Scale: %f", dpi, (float)dpi / USER_DEFAULT_SCREEN_DPI);
-  }
 
   GameState game_state = { .name = "cgame" };
   game_init(&game_state);
