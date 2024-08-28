@@ -6,8 +6,12 @@ SET "NAME=cgame"
 SET CONFIG=D
 SET CC=cl.exe
 SET C_FLAGS=/std:c17 /experimental:c11atomics /GR- /nologo /Gm- /WX /Wall ^
-  /wd4191 /wd4820 /wd4255 /wd5045 /wd4505 /I"src" /I"src\pch" /I"src\deps" ^
-  /wd4710 /wd4711 /I"src\deps\d3d12" /I"src\deps\nuklear" ^
+  /wd4820 /wd4255 /wd5045 /wd4710 /wd4711 ^
+  /I"src" ^
+  /I"src\pch" ^
+  /I"src\deps" ^
+  /I"src\deps\d3d12" ^
+  /I"src\deps\nuklear" ^
   /I"src\deps\box2d\include"
 
 IF %CONFIG%==D SET C_FLAGS=%C_FLAGS% /GS /Zi /Od /D"_DEBUG" /MTd /RTCs
@@ -71,8 +75,9 @@ IF NOT EXIST pch.lib (
 :: Nuklear
 ::
 IF NOT EXIST nuklear.lib (
-  %CC% %C_FLAGS% /wd4127 /wd4116 /wd4061 /wd4701 /Fd:"nuklear.pdb" ^
-    /D_CRT_SECURE_NO_WARNINGS /c "src\deps\nuklear\*.c"
+  %CC% %C_FLAGS% /Fd:"nuklear.pdb" /c "src\deps\nuklear\*.c" ^
+    /wd4127 /wd4116 /wd4061 /wd4701 ^
+    /D_CRT_SECURE_NO_WARNINGS
 
   lib %LIB_FLAGS% "*.obj" /OUT:"nuklear.lib"
 
@@ -83,8 +88,9 @@ IF NOT EXIST nuklear.lib (
 :: Box2D
 ::
 IF NOT EXIST box2d.lib (
-  %CC% %C_FLAGS% /wd4061 /wd4242 /wd4244 /wd4189 /wd4100 /wd4456 /wd4018 ^
-  /wd4245 /wd4296 /wd4389 /Fd:"box2d.pdb" /c "src\deps\box2d\src\*.c"
+  %CC% %C_FLAGS% /Fd:"box2d.pdb" /c "src\deps\box2d\src\*.c" ^
+    /wd4061 /wd4242 /wd4244 /wd4189 /wd4100 /wd4456 /wd4018 /wd4245 /wd4296 ^
+    /wd4389
 
   lib %LIB_FLAGS% "*.obj" /OUT:"box2d.lib"
 
@@ -99,8 +105,8 @@ IF NOT "%1"=="hlsl" (
 
   %CC% %C_FLAGS% /MP /Fp:"pch.pch" /Fd:"pch.pdb" /Fe:"%NAME%.exe" ^
     /Yu"pch.h" "src\*.c" ^
-    /link %LINK_FLAGS% d3d12.lib dxgi.lib user32.lib pch.lib ^
-    nuklear.lib box2d.lib
+    /link %LINK_FLAGS% d3d12.lib dxgi.lib user32.lib ^
+    pch.lib nuklear.lib box2d.lib
 
   IF "%1"=="run" IF EXIST "%NAME%.exe" "%NAME%.exe"
 )
