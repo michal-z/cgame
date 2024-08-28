@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "nuklear_with_config.h"
+#include "box2d/box2d.h"
 
 #define LOG(...) do \
 { \

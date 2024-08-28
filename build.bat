@@ -7,8 +7,8 @@ SET CONFIG=D
 SET CC=cl.exe
 SET C_FLAGS=/std:c17 /experimental:c11atomics /GR- /nologo /Gm- /WX /Wall ^
   /wd4191 /wd4820 /wd4255 /wd5045 /wd4505 /I"src" /I"src\pch" /I"src\deps" ^
-  /D_CRT_SECURE_NO_WARNINGS ^
-  /wd4710 /wd4711 /I"src\deps\d3d12" /I"src\deps\nuklear"
+  /wd4710 /wd4711 /I"src\deps\d3d12" /I"src\deps\nuklear" ^
+  /I"src\deps\box2d\include"
 
 IF %CONFIG%==D SET C_FLAGS=%C_FLAGS% /GS /Zi /Od /D"_DEBUG" /MTd /RTCs
 IF %CONFIG%==R SET C_FLAGS=%C_FLAGS% /O2 /Gy /MT /D"NDEBUG" /Oi /Ot /GS-
@@ -72,9 +72,21 @@ IF NOT EXIST pch.lib (
 ::
 IF NOT EXIST nuklear.lib (
   %CC% %C_FLAGS% /wd4127 /wd4116 /wd4061 /wd4701 /Fd:"nuklear.pdb" ^
-    /c "src\deps\nuklear\*.c"
+    /D_CRT_SECURE_NO_WARNINGS /c "src\deps\nuklear\*.c"
 
   lib %LIB_FLAGS% "*.obj" /OUT:"nuklear.lib"
+
+  IF EXIST "*.obj" DEL "*.obj"
+) & if ERRORLEVEL 1 GOTO error
+
+::
+:: Box2D
+::
+IF NOT EXIST box2d.lib (
+  %CC% %C_FLAGS% /wd4061 /wd4242 /wd4244 /wd4189 /wd4100 /wd4456 /wd4018 ^
+  /wd4245 /wd4296 /wd4389 /Fd:"box2d.pdb" /c "src\deps\box2d\src\*.c"
+
+  lib %LIB_FLAGS% "*.obj" /OUT:"box2d.lib"
 
   IF EXIST "*.obj" DEL "*.obj"
 ) & if ERRORLEVEL 1 GOTO error
@@ -87,7 +99,8 @@ IF NOT "%1"=="hlsl" (
 
   %CC% %C_FLAGS% /MP /Fp:"pch.pch" /Fd:"pch.pdb" /Fe:"%NAME%.exe" ^
     /Yu"pch.h" "src\*.c" ^
-    /link %LINK_FLAGS% d3d12.lib dxgi.lib user32.lib pch.lib nuklear.lib
+    /link %LINK_FLAGS% d3d12.lib dxgi.lib user32.lib pch.lib ^
+    nuklear.lib box2d.lib
 
   IF "%1"=="run" IF EXIST "%NAME%.exe" "%NAME%.exe"
 )
