@@ -41,26 +41,32 @@ IF "%1"=="clean" (
   IF EXIST "*.exe" DEL "*.exe"
 )
 
-SET COMPILE_HLSL=0
-SET LAST_SHADER=1
-IF "%1"=="hlsl" SET COMPILE_HLSL=1
-IF "%1"=="clean" SET COMPILE_HLSL=1
-
 ::
 :: Shaders
 ::
+:: Compiles all shaders from %FIRST_SHADER% to %LAST_SHADER%.
+:: Shader is selected by defining a preprocessor symbol: _s00, _s01, ...
+:: All shaders are kept in a single source file: "src\shaders\shaders.c".
+::
+SET FIRST_SHADER=0
+SET LAST_SHADER=1
+
+SET COMPILE_HLSL=1
+IF "%1"=="hlsl" SET COMPILE_HLSL=1
+IF "%1"=="clean" SET COMPILE_HLSL=1
+
 IF %COMPILE_HLSL%==1 (
   IF EXIST "%HLSL_OUT_DIR%\*.h" DEL "%HLSL_OUT_DIR%\*.h"
 
-  FOR /L %%i IN (0, 1, %LAST_SHADER%) DO (
+  FOR /L %%i IN (%FIRST_SHADER%, 1, %LAST_SHADER%) DO (
     SET "SH=000000%%i"
     SET SH=s!SH:~-2!
 
     %DXC% %HLSL_FLAGS% /T vs_%HLSL_SM% /E !SH!_vs /D_!SH! src\shaders\shaders.c ^
-    /Fh %HLSL_OUT_DIR%\!SH!_vs.h
+      /Fh %HLSL_OUT_DIR%\!SH!_vs.h
 
     %DXC% %HLSL_FLAGS% /T ps_%HLSL_SM% /E !SH!_ps /D_!SH! src\shaders\shaders.c ^
-    /Fh %HLSL_OUT_DIR%\!SH!_ps.h
+      /Fh %HLSL_OUT_DIR%\!SH!_ps.h
   )
 )
 
