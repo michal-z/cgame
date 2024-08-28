@@ -65,14 +65,6 @@ IF %COMPILE_HLSL%==1 (
 )
 
 ::
-:: Precompiled header
-::
-IF NOT EXIST pch.lib (
-  %CC% %C_FLAGS% /Fo:"pch.lib" /Fp:"pch.pch" /Fd:"pch.pdb" /Yc"pch.h" ^
-    /c "src\pch\pch.c"
-) & if ERRORLEVEL 1 GOTO error
-
-::
 :: Nuklear
 ::
 IF NOT EXIST nuklear.lib (
@@ -96,6 +88,14 @@ IF NOT EXIST box2d.lib (
   lib %LIB_FLAGS% "*.obj" /OUT:"box2d.lib"
 
   IF EXIST "*.obj" DEL "*.obj"
+) & if ERRORLEVEL 1 GOTO error
+
+::
+:: Precompiled header
+::
+IF NOT EXIST pch.lib (
+  %CC% %C_FLAGS% /Fo:"pch.lib" /Fp:"pch.pch" /Fd:"pch.pdb" /Yc"pch.h" ^
+    /c "src\pch\pch.c"
 ) & if ERRORLEVEL 1 GOTO error
 
 ::
