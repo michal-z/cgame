@@ -3,6 +3,7 @@ SETLOCAL enableextensions enabledelayedexpansion
 
 SET "NAME=cgame"
 
+:: (D)ebug, (R)elease
 SET CONFIG=D
 SET CC=cl.exe
 SET C_FLAGS=/std:c17 /experimental:c11atomics /GR- /nologo /Gm- /WX /Wall ^
@@ -17,7 +18,7 @@ SET C_FLAGS=/std:c17 /experimental:c11atomics /GR- /nologo /Gm- /WX /Wall ^
 IF %CONFIG%==D SET C_FLAGS=%C_FLAGS% /GS /Zi /Od /D"_DEBUG" /MTd /RTCs
 IF %CONFIG%==R SET C_FLAGS=%C_FLAGS% /O2 /Gy /MT /D"NDEBUG" /Oi /Ot /GS-
 
-SET LINK_FLAGS=/INCREMENTAL:NO /NOLOGO
+SET LINK_FLAGS=/INCREMENTAL:NO /NOLOGO /NOIMPLIB /NOEXP
 IF %CONFIG%==D SET LINK_FLAGS=%LINK_FLAGS% /DEBUG:FULL
 IF %CONFIG%==R SET LINK_FLAGS=%LINK_FLAGS%
 
@@ -108,6 +109,8 @@ IF NOT "%1"=="hlsl" (
     /link %LINK_FLAGS% d3d12.lib dxgi.lib user32.lib ^
     pch.lib nuklear.lib box2d.lib
 
+  IF EXIST "*.obj" DEL "*.obj"
+
   IF "%1"=="run" IF EXIST "%NAME%.exe" "%NAME%.exe"
 )
 
@@ -120,6 +123,3 @@ ECHO ERROR
 ECHO ---------------
 
 :end
-IF EXIST "*.obj" DEL "*.obj"
-IF EXIST "%NAME%.lib" DEL "%NAME%.lib"
-IF EXIST "*.exp" DEL "*.exp"
