@@ -88,8 +88,7 @@ IF NOT EXIST nuklear.lib (
 ::
 IF NOT EXIST box2d.lib (
   %CC% %C_FLAGS% /Fd:"box2d.pdb" /c "src\deps\box2d\src\*.c" ^
-    /wd4061 /wd4242 /wd4244 /wd4189 /wd4100 /wd4456 /wd4018 /wd4245 /wd4296 ^
-    /wd4389
+  /W3 /wd4242 /wd4244 /wd4018
 
   lib %LIB_FLAGS% "*.obj" /OUT:"box2d.lib"
 
