@@ -93,6 +93,7 @@ struct GpuUploadBufferRegion
   D3D12_GPU_VIRTUAL_ADDRESS gpu_addr;
   ID3D12Resource *buffer;
   uint64_t buffer_offset;
+  uint64_t size;
 };
 
 void gpu_init_context(GpuContext *gpu, HWND window);

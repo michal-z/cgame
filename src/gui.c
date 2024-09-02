@@ -95,7 +95,7 @@ gui_init_end(GuiContext *gui, GpuContext *gpu)
     ID3D12Device14_CreateShaderResourceView(gpu->device,
       gui->font_texture, NULL,
       (D3D12_CPU_DESCRIPTOR_HANDLE){
-        .ptr = gpu->shader_dheap_start_cpu.ptr + RDH_GUI_TEXTURE
+        .ptr = gpu->shader_dheap_start_cpu.ptr + RDH_GUI_FONT_TEXTURE
           * gpu->shader_dheap_descriptor_size
       });
 

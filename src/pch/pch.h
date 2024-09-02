@@ -110,3 +110,7 @@ void mem_free(void *ptr, const char *file, int32_t line);
 #undef ID3D12GraphicsCommandList10_Barrier
 #define ID3D12GraphicsCommandList10_Barrier(This,...)	\
   ( (This)->lpVtbl -> Barrier(This,__VA_ARGS__) )
+
+#undef ID3D12GraphicsCommandList10_SetGraphicsRoot32BitConstants
+#define ID3D12GraphicsCommandList10_SetGraphicsRoot32BitConstants(This,...)	\
+  ( (This)->lpVtbl -> SetGraphicsRoot32BitConstants(This,__VA_ARGS__) )

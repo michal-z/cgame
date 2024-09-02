@@ -530,5 +530,6 @@ gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size)
     .gpu_addr = gpu->upload_heaps[gpu->frame_index].gpu_base_addr + offset,
     .buffer = gpu->upload_heaps[gpu->frame_index].buffer,
     .buffer_offset = offset,
+    .size = size,
   };
 }

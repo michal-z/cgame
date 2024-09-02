@@ -7,6 +7,57 @@
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
 
+void m4x4_orthographic_off_center(float l, float r, float t, float b, float n,
+  float f, float4x4 m)
+{
+  float d = 1.0f / (f - n);
+  m[0][0] = 2.0f / (r - l);
+  m[0][1] = 0.0f;
+  m[0][2] = 0.0f;
+  m[0][3] = 0.0f;
+
+  m[1][0] = 0.0f;
+  m[1][1] = 2.0f / (t - b);
+  m[1][2] = 0.0f;
+  m[1][3] = 0.0f;
+
+  m[2][0] = 0.0f;
+  m[2][1] = 0.0f;
+  m[2][2] = d;
+  m[2][3] = 0.0f;
+
+  m[3][0] = -(r + l) / (r - l);
+  m[3][1] = -(t + b) / (t - b);
+  m[3][2] = -d * n;
+  m[3][3] = 1.0f;
+}
+
+void m4x4_transpose(float4x4 m)
+{
+  float4x4 t;
+  memcpy(t, m, sizeof(float4x4));
+
+  m[0][0] = t[0][0];
+  m[0][1] = t[1][0];
+  m[0][2] = t[2][0];
+  m[0][3] = t[3][0];
+
+  m[1][0] = t[0][1];
+  m[1][1] = t[1][1];
+  m[1][2] = t[2][1];
+  m[1][3] = t[3][1];
+
+  m[2][0] = t[0][2];
+  m[2][1] = t[1][2];
+  m[2][2] = t[2][2];
+  m[2][3] = t[3][2];
+
+  m[3][0] = t[0][3];
+  m[3][1] = t[1][3];
+  m[3][2] = t[2][3];
+  m[3][3] = t[3][3];
+}
+
 static double
 get_time(void)
 {
@@ -103,13 +154,26 @@ window_create(const char *name, int32_t width, int32_t height)
 #define PSO_GUI 1
 #define PSO_MAX 16
 
-#define STATIC_GEO_BUFFER_SIZE (16 * 1024 * 1024)
+#define STATIC_GEO_BUFFER_MAX_VERTS (100 * 1000)
+
+#define OBJ_MAX 1000
 
 #define FONT_ROBOTO_16 0
 #define FONT_ROBOTO_24 1
 #define FONT_MAX 4
 
+#define MESH_SQUARE_1 0
+#define MESH_SQUARE_1_INSET_01 1
+#define MESH_MAX 32
+
 typedef struct GameState GameState;
+typedef struct Mesh Mesh;
+
+struct Mesh
+{
+  uint32_t first_vertex;
+  uint32_t num_vertices;
+};
 
 struct GameState
 {
@@ -119,8 +183,14 @@ struct GameState
   ID3D12RootSignature *pso_rs[PSO_MAX];
   ID3D12PipelineState *pso[PSO_MAX];
   ID3D12Resource *static_geo_buffer;
+  ID3D12Resource *object_buffer;
   struct nk_font *fonts[FONT_MAX];
+  Mesh meshes[MESH_MAX];
+  uint32_t meshes_num;
+  CgObject objects[OBJ_MAX];
+  uint32_t objects_num;
 };
+static_assert(sizeof(GameState) <= 128 * 1024);
 
 static void
 game_init(GameState *game_state)
@@ -236,6 +306,40 @@ game_init(GameState *game_state)
     &IID_ID3D12PipelineState, &game_state->pso[PSO_GUI]));
 
   //
+  // Object buffer (dynamic)
+  //
+  VHR(ID3D12Device14_CreateCommittedResource3(gpu->device,
+    &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
+    D3D12_HEAP_FLAG_NONE,
+    &(D3D12_RESOURCE_DESC1){
+      .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+      .Width = OBJ_MAX * sizeof(CgObject),
+      .Height = 1,
+      .DepthOrArraySize = 1,
+      .MipLevels = 1,
+      .SampleDesc = { .Count = 1 },
+      .Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+    },
+    D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, NULL, 0, NULL,
+    &IID_ID3D12Resource, &game_state->object_buffer));
+
+  ID3D12Device14_CreateShaderResourceView(gpu->device,
+    game_state->object_buffer,
+    &(D3D12_SHADER_RESOURCE_VIEW_DESC){
+      .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+      .Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+      .Buffer = {
+        .FirstElement = 0,
+        .NumElements = OBJ_MAX,
+        .StructureByteStride = sizeof(CgObject),
+      },
+    },
+    (D3D12_CPU_DESCRIPTOR_HANDLE){
+      .ptr = gpu->shader_dheap_start_cpu.ptr + RDH_OBJECT_BUFFER
+        * gpu->shader_dheap_descriptor_size
+    });
+
+  //
   // Static geometry buffer
   //
   VHR(ID3D12Device14_CreateCommittedResource3(gpu->device,
@@ -243,7 +347,7 @@ game_init(GameState *game_state)
     D3D12_HEAP_FLAG_NONE,
     &(D3D12_RESOURCE_DESC1){
       .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
-      .Width = STATIC_GEO_BUFFER_SIZE,
+      .Width = STATIC_GEO_BUFFER_MAX_VERTS * sizeof(CgVertex),
       .Height = 1,
       .DepthOrArraySize = 1,
       .MipLevels = 1,
@@ -260,8 +364,8 @@ game_init(GameState *game_state)
       .Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
       .Buffer = {
         .FirstElement = 0,
-        .NumElements = STATIC_GEO_BUFFER_SIZE / sizeof(Vertex),
-        .StructureByteStride = sizeof(Vertex),
+        .NumElements = STATIC_GEO_BUFFER_MAX_VERTS,
+        .StructureByteStride = sizeof(CgVertex),
       },
     },
     (D3D12_CPU_DESCRIPTOR_HANDLE){
@@ -270,13 +374,22 @@ game_init(GameState *game_state)
     });
 
   {
-    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu, 3 *
-      sizeof(Vertex));
+    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
+      STATIC_GEO_BUFFER_MAX_VERTS * sizeof(CgVertex));
     {
-      Vertex *v = (Vertex *)upload.cpu_addr;
-      *v++ = (Vertex){ .x = -1.0f, .y = -1.0f };
-      *v++ = (Vertex){ .x =  0.0f, .y =  1.0f };
-      *v++ = (Vertex){ .x =  0.8f, .y = -0.7f };
+      CgVertex *v = (CgVertex *)upload.cpu_addr;
+      *v++ = (CgVertex){ .position = { -0.5f, -0.5f }, .material_index = 0 };
+      *v++ = (CgVertex){ .position = { -0.5f,  0.5f }, .material_index = 0 };
+      *v++ = (CgVertex){ .position = {  0.5f,  0.5f }, .material_index = 0 };
+      *v++ = (CgVertex){ .position = { -0.5f, -0.5f }, .material_index = 0 };
+      *v++ = (CgVertex){ .position = {  0.5f,  0.5f }, .material_index = 0 };
+      *v++ = (CgVertex){ .position = {  0.5f, -0.5f }, .material_index = 0 };
+
+      game_state->meshes[MESH_SQUARE_1] = (Mesh){
+        .first_vertex = 0,
+        .num_vertices = 6,
+      };
+      game_state->meshes_num += 1;
     }
 
     VHR(ID3D12CommandAllocator_Reset(gpu->command_allocators[0]));
@@ -285,13 +398,26 @@ game_init(GameState *game_state)
 
     ID3D12GraphicsCommandList10_CopyBufferRegion(gpu->command_list,
       game_state->static_geo_buffer, 0, upload.buffer, upload.buffer_offset,
-      3 * sizeof(Vertex));
+      6 * sizeof(CgVertex));
 
     VHR(ID3D12GraphicsCommandList10_Close(gpu->command_list));
     ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
       (ID3D12CommandList **)&gpu->command_list);
     gpu_finish_commands(gpu);
   }
+
+  game_state->objects[game_state->objects_num++] = (CgObject){
+    .position = { 0.0f, 0.0f },
+    .rotation = 0.0f,
+    .mesh_index = MESH_SQUARE_1,
+    .colors = { 0x00ff0000 },
+  };
+  game_state->objects[game_state->objects_num++] = (CgObject){
+    .position = { 7.0f, 3.0f },
+    .rotation = 0.5f,
+    .mesh_index = MESH_SQUARE_1,
+    .colors = { 0x00ffff00 },
+  };
 }
 
 static void
@@ -304,6 +430,7 @@ game_deinit(GameState *game_state)
   gui_deinit(&game_state->gui_context);
 
   SAFE_RELEASE(game_state->static_geo_buffer);
+  SAFE_RELEASE(game_state->object_buffer);
   for (uint32_t i = 0; i < PSO_MAX; ++i) {
     SAFE_RELEASE(game_state->pso[i]);
     SAFE_RELEASE(game_state->pso_rs[i]);
@@ -390,20 +517,60 @@ game_draw(GameState *game_state)
       gpu->rtv_dheap_descriptor_size
   };
 
-  ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
-    &(D3D12_BARRIER_GROUP){
-      .Type = D3D12_BARRIER_TYPE_TEXTURE,
-      .NumBarriers = 1,
-      .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
-        .SyncBefore = D3D12_BARRIER_SYNC_NONE,
-        .SyncAfter = D3D12_BARRIER_SYNC_RENDER_TARGET,
-        .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
-        .AccessAfter = D3D12_BARRIER_ACCESS_RENDER_TARGET,
-        .LayoutBefore = D3D12_BARRIER_LAYOUT_PRESENT,
-        .LayoutAfter = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        .pResource = gpu->swap_chain_buffers[gpu->frame_index],
+  ID3D12GraphicsCommandList10_Barrier(cmdlist, 2,
+    (D3D12_BARRIER_GROUP[]){
+      { .Type = D3D12_BARRIER_TYPE_TEXTURE,
+        .NumBarriers = 1,
+        .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+          .SyncBefore = D3D12_BARRIER_SYNC_NONE,
+          .SyncAfter = D3D12_BARRIER_SYNC_RENDER_TARGET,
+          .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
+          .AccessAfter = D3D12_BARRIER_ACCESS_RENDER_TARGET,
+          .LayoutBefore = D3D12_BARRIER_LAYOUT_PRESENT,
+          .LayoutAfter = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+          .pResource = gpu->swap_chain_buffers[gpu->frame_index],
+        },
+      },
+      { .Type = D3D12_BARRIER_TYPE_BUFFER,
+        .NumBarriers = 1,
+        .pBufferBarriers = &(D3D12_BUFFER_BARRIER){
+          .SyncBefore = D3D12_BARRIER_SYNC_NONE,
+          .SyncAfter = D3D12_BARRIER_SYNC_COPY,
+          .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
+          .AccessAfter = D3D12_BARRIER_ACCESS_COPY_DEST,
+          .pResource = game_state->object_buffer,
+          .Size = UINT64_MAX,
+        },
       },
     });
+
+  {
+    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
+      game_state->objects_num * sizeof(CgObject));
+
+    CgObject *obj = (CgObject *)upload.cpu_addr;
+    for (uint32_t i = 0; i < game_state->objects_num; ++i) {
+      obj[i] = game_state->objects[i];
+    }
+
+    ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist,
+      game_state->object_buffer, 0, upload.buffer, upload.buffer_offset,
+      upload.size);
+
+    ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+      &(D3D12_BARRIER_GROUP){
+        .Type = D3D12_BARRIER_TYPE_BUFFER,
+        .NumBarriers = 1,
+        .pBufferBarriers = &(D3D12_BUFFER_BARRIER){
+          .SyncBefore = D3D12_BARRIER_SYNC_COPY,
+          .SyncAfter = D3D12_BARRIER_SYNC_DRAW,
+          .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
+          .AccessAfter = D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+          .pResource = game_state->object_buffer,
+          .Size = UINT64_MAX,
+        },
+      });
+  }
 
   ID3D12GraphicsCommandList10_OMSetRenderTargets(cmdlist, 1, &rt_descriptor,
     TRUE, NULL);
@@ -417,7 +584,34 @@ game_draw(GameState *game_state)
     game_state->pso_rs[PSO_FIRST]);
   ID3D12GraphicsCommandList10_SetPipelineState(cmdlist,
     game_state->pso[PSO_FIRST]);
-  ID3D12GraphicsCommandList10_DrawInstanced(cmdlist, 3, 1, 0, 0);
+
+  {
+    float aspect = (float)gpu->viewport_width / gpu->viewport_height;
+    float map_size = 10.0f;
+
+    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
+      sizeof(CgPerFrameConst));
+
+    CgPerFrameConst *frame_const = (CgPerFrameConst *)upload.cpu_addr;
+
+    m4x4_orthographic_off_center(-0.5f * map_size * aspect,
+      0.5f * map_size * aspect, -0.5f * map_size, 0.5f * map_size, 0.0f, 1.0f,
+      frame_const->mvp);
+    m4x4_transpose(frame_const->mvp);
+
+    ID3D12GraphicsCommandList10_SetGraphicsRootConstantBufferView(cmdlist, 1,
+      upload.gpu_addr);
+  }
+
+  for (uint32_t i = 0; i < game_state->objects_num; ++i) {
+    CgObject *obj = &game_state->objects[i];
+    Mesh *mesh = &game_state->meshes[obj->mesh_index];
+
+    ID3D12GraphicsCommandList10_SetGraphicsRoot32BitConstants(cmdlist, 0, 2,
+      (uint32_t[]){ mesh->first_vertex, i }, 0);
+    ID3D12GraphicsCommandList10_DrawInstanced(cmdlist, mesh->num_vertices, 1, 0, 
+      0);
+  }
 
   gui_draw(&game_state->gui_context, gpu, game_state->pso[PSO_GUI],
     game_state->pso_rs[PSO_GUI]);

@@ -6,3 +6,4 @@
 *.pdb binary
 *.exe binary
 *.ttf binary
+*.mesh binary
