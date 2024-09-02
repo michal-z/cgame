@@ -383,9 +383,9 @@ game_init(GameState *game_state)
       *v++ = (CgVertex){ .position = { -0.5f, -0.5f }, .material_index = 0 };
       *v++ = (CgVertex){ .position = { -0.5f,  0.5f }, .material_index = 0 };
       *v++ = (CgVertex){ .position = {  0.5f,  0.5f }, .material_index = 0 };
-      *v++ = (CgVertex){ .position = { -0.5f, -0.5f }, .material_index = 0 };
-      *v++ = (CgVertex){ .position = {  0.5f,  0.5f }, .material_index = 0 };
-      *v++ = (CgVertex){ .position = {  0.5f, -0.5f }, .material_index = 0 };
+      *v++ = (CgVertex){ .position = { -0.5f, -0.5f }, .material_index = 1 };
+      *v++ = (CgVertex){ .position = {  0.5f,  0.5f }, .material_index = 1 };
+      *v++ = (CgVertex){ .position = {  0.5f, -0.5f }, .material_index = 1 };
 
       game_state->meshes[MESH_SQUARE_1] = (Mesh){
         .first_vertex = 0,
@@ -412,13 +412,13 @@ game_init(GameState *game_state)
     .position = { 0.0f, 0.0f },
     .rotation = 0.0f,
     .mesh_index = MESH_SQUARE_1,
-    .colors = { 0x00ff0000 },
+    .colors = { 0x00ff0000, 0x0000ff00 },
   };
   game_state->objects[game_state->objects_num++] = (CgObject){
     .position = { 7.0f, 3.0f },
     .rotation = 0.5f,
     .mesh_index = MESH_SQUARE_1,
-    .colors = { 0x00ffff00 },
+    .colors = { 0x00ffff00, 0x00ffff00 },
   };
 }
 
