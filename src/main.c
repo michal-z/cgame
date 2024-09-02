@@ -7,8 +7,9 @@
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
 
-void m4x4_orthographic_off_center(float l, float r, float t, float b, float n,
-  float f, float4x4 m)
+void
+m4x4_ortho_off_center(float4x4 m, float l, float r, float t, float b, float n,
+  float f)
 {
   float d = 1.0f / (f - n);
   m[0][0] = 2.0f / (r - l);
@@ -32,7 +33,8 @@ void m4x4_orthographic_off_center(float l, float r, float t, float b, float n,
   m[3][3] = 1.0f;
 }
 
-void m4x4_transpose(float4x4 m)
+void
+m4x4_transpose(float4x4 m)
 {
   float4x4 t;
   memcpy(t, m, sizeof(float4x4));
@@ -444,7 +446,9 @@ game_update(GameState *game_state)
 {
   GpuContext *gpu = &game_state->gpu_context;
 
-  window_update_frame_stats(gpu->window, game_state->name);
+  float dt = window_update_frame_stats(gpu->window, game_state->name);
+
+  game_state->objects[1].rotation += 0.5f * dt;
 
   GpuContextState gpu_ctx_state = gpu_update_context(gpu);
 
@@ -594,9 +598,8 @@ game_draw(GameState *game_state)
 
     CgPerFrameConst *frame_const = (CgPerFrameConst *)upload.cpu_addr;
 
-    m4x4_orthographic_off_center(-0.5f * map_size * aspect,
-      0.5f * map_size * aspect, -0.5f * map_size, 0.5f * map_size, 0.0f, 1.0f,
-      frame_const->mvp);
+    m4x4_ortho_off_center(frame_const->mvp, -0.5f * map_size * aspect,
+      0.5f * map_size * aspect, 0.5f * map_size, -0.5f * map_size, 0.0f, 1.0f);
     m4x4_transpose(frame_const->mvp);
 
     ID3D12GraphicsCommandList10_SetGraphicsRootConstantBufferView(cmdlist, 1,
