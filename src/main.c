@@ -490,6 +490,10 @@ game_update(GameState *game_state)
 
   float dt = window_update_frame_stats(gpu->window, game_state->name);
 
+  game_state->objects[0].position[0] += dt;
+  game_state->objects[0].position[0] = fmodf(
+    game_state->objects[0].position[0], 8.0f);
+
   game_state->objects[1].rotation += 0.5f * dt;
 
   GpuContextState gpu_ctx_state = gpu_update_context(gpu);
