@@ -705,7 +705,12 @@ main(void)
     }
     nk_input_end(&game_state.gui_context.nkctx);
 
-    if (game_update(&game_state)) game_draw(&game_state);
+    if (game_update(&game_state)) {
+      game_draw(&game_state);
+    } else {
+      // Window is minimized.
+      Sleep(1);
+    }
   }
 
   game_deinit(&game_state);
