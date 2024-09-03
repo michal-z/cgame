@@ -147,9 +147,39 @@ window_create(const char *name, int32_t width, int32_t height)
     CW_USEDEFAULT, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL,
     NULL, NULL);
 
-  VHR(HRESULT_FROM_WIN32(GetLastError()));
+  if (window == NULL)
+    VHR(HRESULT_FROM_WIN32(GetLastError()));
 
   return window;
+}
+
+static void
+load_mesh(const char *filename, uint32_t *points_num, CgVertex *points)
+{
+  assert(filename && (points_num || points));
+
+  HANDLE file = CreateFile(filename, GENERIC_READ, 0, NULL, OPEN_EXISTING, 
+    FILE_ATTRIBUTE_NORMAL, NULL);
+  if (file == NULL)
+    VHR(HRESULT_FROM_WIN32(GetLastError()));
+
+  DWORD num_bytes_read;
+  uint32_t num_points;
+
+  ReadFile(file, &num_points, sizeof(num_points), &num_bytes_read, NULL);
+  if (num_bytes_read != sizeof(num_points))
+    VHR(HRESULT_FROM_WIN32(GetLastError()));
+
+  if (points_num)
+    *points_num = num_points;
+
+  if (points) {
+    ReadFile(file, points, num_points * sizeof(CgVertex), &num_bytes_read, NULL);
+    if (num_bytes_read != num_points * sizeof(CgVertex))
+      VHR(HRESULT_FROM_WIN32(GetLastError()));
+  }
+
+  CloseHandle(file);
 }
 
 #define PSO_FIRST 0
@@ -164,8 +194,7 @@ window_create(const char *name, int32_t width, int32_t height)
 #define FONT_ROBOTO_24 1
 #define FONT_MAX 4
 
-#define MESH_SQUARE_1 0
-#define MESH_SQUARE_1_INSET_01 1
+#define MESH_SQUARE_1_INSET_01 0
 #define MESH_MAX 32
 
 typedef struct GameState GameState;
@@ -376,31 +405,38 @@ game_init(GameState *game_state)
     });
 
   {
-    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
-      STATIC_GEO_BUFFER_MAX_VERTS * sizeof(CgVertex));
-    {
-      CgVertex *v = (CgVertex *)upload.cpu_addr;
-      *v++ = (CgVertex){ .position = { -0.5f, -0.5f }, .material_index = 0 };
-      *v++ = (CgVertex){ .position = { -0.5f,  0.5f }, .material_index = 0 };
-      *v++ = (CgVertex){ .position = {  0.5f,  0.5f }, .material_index = 0 };
-      *v++ = (CgVertex){ .position = { -0.5f, -0.5f }, .material_index = 1 };
-      *v++ = (CgVertex){ .position = {  0.5f,  0.5f }, .material_index = 1 };
-      *v++ = (CgVertex){ .position = {  0.5f, -0.5f }, .material_index = 1 };
-
-      game_state->meshes[MESH_SQUARE_1] = (Mesh){
-        .first_vertex = 0,
-        .num_vertices = 6,
-      };
-      game_state->meshes_num += 1;
-    }
-
     VHR(ID3D12CommandAllocator_Reset(gpu->command_allocators[0]));
     VHR(ID3D12GraphicsCommandList10_Reset(gpu->command_list,
       gpu->command_allocators[0], NULL));
 
-    ID3D12GraphicsCommandList10_CopyBufferRegion(gpu->command_list,
-      game_state->static_geo_buffer, 0, upload.buffer, upload.buffer_offset,
-      6 * sizeof(CgVertex));
+    const char *mesh_filenames[MESH_MAX] = {NULL};
+    mesh_filenames[MESH_SQUARE_1_INSET_01] =
+      "assets/meshes/square_1_inset_01.mesh";
+
+    uint64_t total_num_points = 0;
+
+    for (uint32_t i = 0; i < MESH_MAX; ++i) {
+      if (mesh_filenames[i] == NULL) continue;
+
+      uint32_t num_points;
+      load_mesh(mesh_filenames[i], &num_points, NULL);
+
+      GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
+        num_points * sizeof(CgVertex));
+
+      load_mesh(mesh_filenames[i], NULL, (CgVertex *)upload.cpu_addr);
+
+      ID3D12GraphicsCommandList10_CopyBufferRegion(gpu->command_list,
+        game_state->static_geo_buffer, total_num_points * sizeof(CgVertex),
+        upload.buffer, upload.buffer_offset, upload.size);
+
+      game_state->meshes[i] = (Mesh){
+        .first_vertex = (uint32_t)total_num_points,
+        .num_vertices = num_points,
+      };
+      game_state->meshes_num += 1;
+      total_num_points += num_points;
+    }
 
     VHR(ID3D12GraphicsCommandList10_Close(gpu->command_list));
     ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
@@ -411,14 +447,20 @@ game_init(GameState *game_state)
   game_state->objects[game_state->objects_num++] = (CgObject){
     .position = { 0.0f, 0.0f },
     .rotation = 0.0f,
-    .mesh_index = MESH_SQUARE_1,
-    .colors = { 0x00ff0000, 0x0000ff00 },
+    .mesh_index = MESH_SQUARE_1_INSET_01,
+    .colors = {
+      nk_color_u32(nk_rgba_f(1.0f, 0.0f, 0.0f, 1.0f)),
+      nk_color_u32(nk_rgba_f(0.0f, 0.0f, 0.0f, 1.0f)),
+    },
   };
   game_state->objects[game_state->objects_num++] = (CgObject){
     .position = { 7.0f, 3.0f },
     .rotation = 0.5f,
-    .mesh_index = MESH_SQUARE_1,
-    .colors = { 0x00ffff00, 0x00ffff00 },
+    .mesh_index = MESH_SQUARE_1_INSET_01,
+    .colors = {
+      nk_color_u32(nk_rgba_f(1.0f, 1.0f, 0.0f, 1.0f)),
+      nk_color_u32(nk_rgba_f(0.0f, 0.0f, 0.0f, 1.0f)),
+    },
   };
 }
 

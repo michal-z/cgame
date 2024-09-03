@@ -38,4 +38,5 @@ struct CgPerFrameConst
 
 #ifndef HLSL
 static_assert(sizeof(CgObject) == 32);
+static_assert(sizeof(CgVertex) == 12);
 #endif

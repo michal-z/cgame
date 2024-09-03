@@ -2,9 +2,9 @@
 
 float4 unpack_color(uint color)
 {
-  return float4(((color & 0xff0000) >> 16) / 255.0,
+  return float4((color & 0xff) / 255.0,
     ((color & 0xff00) >> 8) / 255.0,
-    (color & 0xff) / 255.0,
+    ((color & 0xff0000) >> 16) / 255.0,
     ((color & 0xff000000) >> 24) / 255.0);
 }
 

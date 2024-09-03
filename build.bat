@@ -7,7 +7,8 @@ SET "NAME=cgame"
 SET CONFIG=D
 SET CC=cl.exe
 SET C_FLAGS=/std:c17 /experimental:c11atomics /GR- /nologo /Gm- /WX /Wall ^
-  /wd4820 /wd4255 /wd5045 /wd4710 /wd4711 ^
+  /fp:precise ^
+  /wd4820 /wd4255 /wd5045 /wd4710 /wd4711 /wd4505 ^
   /I"src" ^
   /I"src\pch" ^
   /I"src\deps" ^
