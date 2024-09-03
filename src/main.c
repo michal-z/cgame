@@ -218,7 +218,6 @@ struct GameState
   ID3D12PipelineState *pso[PSO_MAX];
   ID3D12Resource *static_geo_buffer;
   ID3D12Resource *object_buffer;
-  ID3D12Resource *ds_target;
   struct nk_font *fonts[FONT_MAX];
   Mesh meshes[MESH_MAX];
   uint32_t meshes_num;
@@ -226,34 +225,6 @@ struct GameState
   uint32_t objects_num;
 };
 static_assert(sizeof(GameState) <= 64 * 1024);
-
-static ID3D12Resource *
-create_depth_stencil_target(ID3D12Device14 *device, uint32_t width,
-  uint32_t height)
-{
-  ID3D12Resource *tex;
-  VHR(ID3D12Device14_CreateCommittedResource3(device,
-    &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
-    D3D12_HEAP_FLAG_NONE,
-    &(D3D12_RESOURCE_DESC1){
-      .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-      .Width = width,
-      .Height = height,
-      .Format = DEPTH_STENCIL_TARGET_FORMAT,
-      .DepthOrArraySize = 1,
-      .MipLevels = 1,
-      .SampleDesc = { .Count = 1 },
-      .Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL,
-    },
-    D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-    &(D3D12_CLEAR_VALUE){
-      .Format = DEPTH_STENCIL_TARGET_FORMAT,
-      .DepthStencil = { .Depth = 1.0f, .Stencil = 0 },
-    },
-    NULL, 0, NULL,
-    &IID_ID3D12Resource, &tex));
-  return tex;
-}
 
 static void
 game_init(GameState *game_state)
@@ -270,7 +241,12 @@ game_init(GameState *game_state)
       (int32_t)(720 * dpi_scale));
   }
 
-  gpu_init_context(&game_state->gpu_context, window);
+  gpu_init_context(&game_state->gpu_context,
+    &(GpuContextDesc){
+      .window = window,
+      .ds_target_format = DEPTH_STENCIL_TARGET_FORMAT,
+      .ds_target_clear_value = { .Depth = 1.0f, .Stencil = 0 },
+    });
 
   GpuContext *gpu = &game_state->gpu_context;
   GuiContext *gui = &game_state->gui_context;
@@ -443,15 +419,6 @@ game_init(GameState *game_state)
     });
 
   //
-  // Depth-stencil target
-  //
-  game_state->ds_target = create_depth_stencil_target(gpu->device,
-    gpu->viewport_width, gpu->viewport_height);
-
-  ID3D12Device14_CreateDepthStencilView(gpu->device, game_state->ds_target, NULL,
-    gpu->dsv_dheap_start);
-
-  //
   // Meshes
   //
   {
@@ -530,7 +497,6 @@ game_deinit(GameState *game_state)
 
   SAFE_RELEASE(game_state->static_geo_buffer);
   SAFE_RELEASE(game_state->object_buffer);
-  SAFE_RELEASE(game_state->ds_target);
   for (uint32_t i = 0; i < PSO_MAX; ++i) {
     SAFE_RELEASE(game_state->pso[i]);
     SAFE_RELEASE(game_state->pso_rs[i]);
@@ -550,7 +516,7 @@ game_update(GameState *game_state)
     CgObject *obj = &game_state->objects[0];
     obj->position[0] += dt;
     obj->position[0] = fmodf(obj->position[0], 8.0f);
-    obj->rotation += 0.5f * dt;
+    //obj->rotation += 0.5f * dt;
   }
 
   game_state->objects[1].rotation += 0.5f * dt;
@@ -561,13 +527,7 @@ game_update(GameState *game_state)
     return false;
 
   if (gpu_ctx_state == GpuContextState_WindowResized) {
-    SAFE_RELEASE(game_state->ds_target);
 
-    game_state->ds_target = create_depth_stencil_target(gpu->device,
-      gpu->viewport_width, gpu->viewport_height);
-
-    ID3D12Device14_CreateDepthStencilView(gpu->device, game_state->ds_target, 
-      NULL, gpu->dsv_dheap_start);
   } else if (gpu_ctx_state == GpuContextState_DeviceLost) {
     // TODO:
   }
@@ -689,7 +649,6 @@ game_draw(GameState *game_state)
 
   ID3D12GraphicsCommandList10_OMSetRenderTargets(cmdlist, 1, &rt_descriptor,
     TRUE, &gpu->dsv_dheap_start);
-
   ID3D12GraphicsCommandList10_ClearRenderTargetView(cmdlist, rt_descriptor,
     (float[4]){ 0.2f, 0.4f, 0.8f, 1.0f }, 0, NULL);
   ID3D12GraphicsCommandList10_ClearDepthStencilView(cmdlist, gpu->dsv_dheap_start,
@@ -702,6 +661,7 @@ game_draw(GameState *game_state)
   ID3D12GraphicsCommandList10_SetPipelineState(cmdlist,
     game_state->pso[PSO_FIRST]);
 
+  // Bind per frame constant data at root index 1
   {
     float aspect = (float)gpu->viewport_width / gpu->viewport_height;
     float map_size = 10.0f;

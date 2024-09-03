@@ -18,6 +18,7 @@
 
 typedef struct GpuUploadMemoryHeap GpuUploadMemoryHeap;
 typedef struct GpuContext GpuContext;
+typedef struct GpuContextDesc GpuContextDesc;
 typedef struct GpuUploadBufferRegion GpuUploadBufferRegion;
 
 typedef enum GpuContextState GpuContextState;
@@ -37,6 +38,13 @@ struct GpuUploadMemoryHeap
   D3D12_GPU_VIRTUAL_ADDRESS gpu_base_addr;
   uint32_t size;
   uint32_t capacity;
+};
+
+struct GpuContextDesc
+{
+  HWND window;
+  D3D12_DEPTH_STENCIL_VALUE ds_target_clear_value;
+  DXGI_FORMAT ds_target_format;
 };
 
 struct GpuContext
@@ -65,6 +73,10 @@ struct GpuContext
   uint32_t swap_chain_flags;
   uint32_t swap_chain_present_interval;
   ID3D12Resource *swap_chain_buffers[GPU_MAX_BUFFERED_FRAMES];
+
+  ID3D12Resource *ds_target;
+  DXGI_FORMAT ds_target_format;
+  D3D12_DEPTH_STENCIL_VALUE ds_target_clear_value;
 
   ID3D12DescriptorHeap *rtv_dheap;
   D3D12_CPU_DESCRIPTOR_HANDLE rtv_dheap_start;
@@ -96,7 +108,7 @@ struct GpuUploadBufferRegion
   uint64_t size;
 };
 
-void gpu_init_context(GpuContext *gpu, HWND window);
+void gpu_init_context(GpuContext *gpu, GpuContextDesc *desc);
 void gpu_deinit_context(GpuContext *gpu);
 GpuContextState gpu_update_context(GpuContext *gpu);
 void gpu_finish_commands(GpuContext *gpu);

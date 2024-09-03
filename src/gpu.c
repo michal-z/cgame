@@ -51,15 +51,42 @@ umh_alloc(GpuUploadMemoryHeap *umh, uint32_t size)
   return ptr;
 }
 
-void
-gpu_init_context(GpuContext *gpu, HWND window)
+static ID3D12Resource *
+create_depth_stencil_target(ID3D12Device14 *device, uint32_t width,
+  uint32_t height, DXGI_FORMAT format, D3D12_DEPTH_STENCIL_VALUE ds_value)
 {
-  assert(gpu && gpu->device == NULL);
+  ID3D12Resource *tex;
+  VHR(ID3D12Device14_CreateCommittedResource3(device,
+    &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
+    D3D12_HEAP_FLAG_NONE,
+    &(D3D12_RESOURCE_DESC1){
+      .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+      .Width = width,
+      .Height = height,
+      .Format = format,
+      .DepthOrArraySize = 1,
+      .MipLevels = 1,
+      .SampleDesc = { .Count = 1 },
+      .Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL,
+    },
+    D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+    &(D3D12_CLEAR_VALUE){
+      .Format = format,
+      .DepthStencil = ds_value,
+    },
+    NULL, 0, NULL, &IID_ID3D12Resource, &tex));
+  return tex;
+}
+
+void
+gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
+{
+  assert(gpu && gpu->device == NULL && desc);
 
   RECT rect = {0};
-  GetClientRect(window, &rect);
+  GetClientRect(desc->window, &rect);
 
-  gpu->window = window;
+  gpu->window = desc->window;
   gpu->viewport_width = rect.right;
   gpu->viewport_height = rect.bottom;
 
@@ -97,9 +124,10 @@ gpu_init_context(GpuContext *gpu, HWND window)
   if (FAILED(D3D12CreateDevice((IUnknown *)gpu->adapter, D3D_FEATURE_LEVEL_11_1,
     &IID_ID3D12Device, &gpu->device)))
   {
-    MessageBox(window, "Failed to create Direct3D 12 Device. This applications "
-      "requires graphics card with FEATURE LEVEL 11.1 support. Please "
-      "update your driver and try again.", "DirectX 12 initialization error",
+    MessageBox(desc->window, "Failed to create Direct3D 12 Device. This "
+      "application requires graphics card with FEATURE LEVEL 11.1 support. "
+      "Please update your driver and try again.",
+      "DirectX 12 initialization error",
       MB_OK | MB_ICONERROR);
     ExitProcess(1);
   }
@@ -155,7 +183,8 @@ gpu_init_context(GpuContext *gpu, HWND window)
     } else LOG("[gpu] Shader Model 6.6 is SUPPORTED");
 
     if (!is_supported) {
-      MessageBox(window, "Your graphics card does not support some required "
+      MessageBox(desc->window,
+        "Your graphics card does not support some required "
         "features. Please update your graphics driver and try again.",
         "DirectX 12 initialization error", MB_OK | MB_ICONERROR);
       ExitProcess(1);
@@ -220,7 +249,7 @@ gpu_init_context(GpuContext *gpu, HWND window)
 
   IDXGISwapChain1 *swap_chain1 = NULL;
   VHR(IDXGIFactory7_CreateSwapChainForHwnd(gpu->dxgi_factory,
-    (IUnknown *)gpu->command_queue, window,
+    (IUnknown *)gpu->command_queue, desc->window,
     &(DXGI_SWAP_CHAIN_DESC1){
       .Width = gpu->viewport_width,
       .Height = gpu->viewport_height,
@@ -240,7 +269,7 @@ gpu_init_context(GpuContext *gpu, HWND window)
     &gpu->swap_chain));
   SAFE_RELEASE(swap_chain1);
 
-  VHR(IDXGIFactory7_MakeWindowAssociation(gpu->dxgi_factory, window,
+  VHR(IDXGIFactory7_MakeWindowAssociation(gpu->dxgi_factory, desc->window,
     DXGI_MWA_NO_WINDOW_CHANGES));
 
   for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
@@ -304,6 +333,19 @@ gpu_init_context(GpuContext *gpu, HWND window)
   LOG("[gpu] Depth-stencil view (DSV) descriptor heap created "
     "(NumDescriptors: %d, DescriptorSize: %d)",
     GPU_MAX_DSV_DESCRIPTORS, gpu->dsv_dheap_descriptor_size);
+
+  gpu->ds_target = NULL;
+  gpu->ds_target_format = desc->ds_target_format;
+  gpu->ds_target_clear_value = desc->ds_target_clear_value;
+
+  if (gpu->ds_target_format != DXGI_FORMAT_UNKNOWN) {
+    gpu->ds_target = create_depth_stencil_target(gpu->device,
+      gpu->viewport_width, gpu->viewport_height, gpu->ds_target_format,
+      gpu->ds_target_clear_value);
+
+    ID3D12Device14_CreateDepthStencilView(gpu->device, gpu->ds_target, NULL,
+      gpu->dsv_dheap_start);
+  }
 
   //
   // CBV, SRV, UAV descriptor heap
@@ -370,6 +412,7 @@ gpu_deinit_context(GpuContext *gpu)
   SAFE_RELEASE(gpu->frame_fence);
   SAFE_RELEASE(gpu->shader_dheap);
   SAFE_RELEASE(gpu->rtv_dheap);
+  SAFE_RELEASE(gpu->ds_target);
   SAFE_RELEASE(gpu->dsv_dheap);
   for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
     SAFE_RELEASE(gpu->swap_chain_buffers[i]);
@@ -498,6 +541,17 @@ gpu_update_context(GpuContext *gpu)
     gpu->viewport_width = current_rect.right;
     gpu->viewport_height = current_rect.bottom;
     gpu->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gpu->swap_chain);
+
+    if (gpu->ds_target) {
+      SAFE_RELEASE(gpu->ds_target);
+
+      gpu->ds_target = create_depth_stencil_target(gpu->device,
+        gpu->viewport_width, gpu->viewport_height, gpu->ds_target_format,
+        gpu->ds_target_clear_value);
+
+      ID3D12Device14_CreateDepthStencilView(gpu->device, gpu->ds_target, NULL,
+        gpu->dsv_dheap_start);
+    }
 
     return GpuContextState_WindowResized;
   }
