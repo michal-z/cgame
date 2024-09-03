@@ -221,7 +221,7 @@ struct GameState
   CgObject objects[OBJ_MAX];
   uint32_t objects_num;
 };
-static_assert(sizeof(GameState) <= 128 * 1024);
+static_assert(sizeof(GameState) <= 64 * 1024);
 
 static void
 game_init(GameState *game_state)

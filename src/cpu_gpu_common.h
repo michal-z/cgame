@@ -6,7 +6,7 @@
 
 #define OBJ_MAX_MATERIALS 4
 
-#ifndef HLSL
+#if __STDC_VERSION__
 typedef struct CgVertex CgVertex;
 typedef struct CgObject CgObject;
 typedef struct CgPerFrameConst CgPerFrameConst;
@@ -36,7 +36,7 @@ struct CgPerFrameConst
   float4x4 mvp;
 };
 
-#ifndef HLSL
+#if __STDC_VERSION__
 static_assert(sizeof(CgObject) == 32);
 static_assert(sizeof(CgVertex) == 12);
 #endif
