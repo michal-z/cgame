@@ -37,7 +37,8 @@ struct nk_font *gui_init_add_font(GuiContext *gui, const char *font_file,
 
 void gui_deinit(GuiContext *gui);
 
-void gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
+void gui_draw(GuiContext *gui, GpuContext *gpu,
+  ID3D12GraphicsCommandList10 *cmdlist, ID3D12PipelineState *pso,
   ID3D12RootSignature *pso_rs);
 
 bool gui_handle_event(GuiContext *gui, HWND wnd, UINT msg, WPARAM wparam,

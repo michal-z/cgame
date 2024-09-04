@@ -169,11 +169,9 @@ gui_deinit(GuiContext *gui)
 }
 
 void
-gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
-  ID3D12RootSignature *pso_rs)
+gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist,
+  ID3D12PipelineState *pso, ID3D12RootSignature *pso_rs)
 {
-  ID3D12GraphicsCommandList10 *cmdlist = gpu->command_list;
-
   GpuUploadBufferRegion upload_vb = gpu_alloc_upload_memory(gpu,
     MAX_VERTEX_BUFFER);
   GpuUploadBufferRegion upload_ib = gpu_alloc_upload_memory(gpu,

@@ -662,7 +662,7 @@ game_draw(GameState *game_state)
       0);
   }
 
-  gui_draw(&game_state->gui_context, gpu, game_state->pso[PSO_GUI],
+  gui_draw(&game_state->gui_context, gpu, cmdlist, game_state->pso[PSO_GUI],
     game_state->pso_rs[PSO_GUI]);
 
   ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
