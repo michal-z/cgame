@@ -665,6 +665,9 @@ game_draw(GameState *game_state)
   gui_draw(&game_state->gui_context, gpu, cmdlist, game_state->pso[PSO_GUI],
     game_state->pso_rs[PSO_GUI]);
 
+  // TODO:
+  //gpu_resolve_render_target(gpu, cmdlist);
+
   ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
     &(D3D12_BARRIER_GROUP){
       .Type = D3D12_BARRIER_TYPE_TEXTURE,

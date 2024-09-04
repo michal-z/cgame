@@ -684,11 +684,8 @@ gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size)
 
   void *cpu_addr = umh_alloc(&gpu->upload_heaps[gpu->frame_index], size);
   if (cpu_addr == NULL) {
-    LOG("[gpu] Upload memory exhausted - waiting for the GPU... "
-      "(command list state is lost!).");
-    gpu_finish_command_lists(gpu);
-    // TODO: begin_command_list()
-    cpu_addr = umh_alloc(&gpu->upload_heaps[gpu->frame_index], size);
+    LOG("[gpu] Upload memory exhausted - increase GPU_UPLOAD_HEAP_CAPACITY "
+      "compile-time constant.");
     assert(cpu_addr);
   }
 
