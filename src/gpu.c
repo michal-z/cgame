@@ -52,8 +52,36 @@ umh_alloc(GpuUploadMemoryHeap *umh, uint32_t size)
 }
 
 static ID3D12Resource *
+create_msaa_target(ID3D12Device14 *device, uint32_t width,
+  uint32_t height, uint32_t num_msaa_samples, float clear_col[4])
+{
+  ID3D12Resource *tex;
+  VHR(ID3D12Device14_CreateCommittedResource3(device,
+    &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
+    D3D12_HEAP_FLAG_NONE,
+    &(D3D12_RESOURCE_DESC1){
+      .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+      .Width = width,
+      .Height = height,
+      .Format = GPU_COLOR_TARGET_FORMAT,
+      .DepthOrArraySize = 1,
+      .MipLevels = 1,
+      .SampleDesc = { .Count = num_msaa_samples },
+      .Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+    },
+    D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+    &(D3D12_CLEAR_VALUE){
+      .Format = GPU_COLOR_TARGET_FORMAT,
+      .Color = { clear_col[0], clear_col[1], clear_col[2], clear_col[3] },
+    },
+    NULL, 0, NULL, &IID_ID3D12Resource, &tex));
+  return tex;
+}
+
+static ID3D12Resource *
 create_depth_stencil_target(ID3D12Device14 *device, uint32_t width,
-  uint32_t height, DXGI_FORMAT format, D3D12_DEPTH_STENCIL_VALUE ds_value)
+  uint32_t height, DXGI_FORMAT format, uint32_t num_msaa_samples,
+  D3D12_DEPTH_STENCIL_VALUE clear_values)
 {
   ID3D12Resource *tex;
   VHR(ID3D12Device14_CreateCommittedResource3(device,
@@ -66,13 +94,13 @@ create_depth_stencil_target(ID3D12Device14 *device, uint32_t width,
       .Format = format,
       .DepthOrArraySize = 1,
       .MipLevels = 1,
-      .SampleDesc = { .Count = 1 },
+      .SampleDesc = { .Count = num_msaa_samples },
       .Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL,
     },
     D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
     &(D3D12_CLEAR_VALUE){
       .Format = format,
-      .DepthStencil = ds_value,
+      .DepthStencil = clear_values,
     },
     NULL, 0, NULL, &IID_ID3D12Resource, &tex));
   return tex;
@@ -124,7 +152,7 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
   if (FAILED(D3D12CreateDevice((IUnknown *)gpu->adapter, D3D_FEATURE_LEVEL_11_1,
     &IID_ID3D12Device, &gpu->device)))
   {
-    MessageBox(desc->window, "Failed to create Direct3D 12 Device. This "
+    MessageBox(gpu->window, "Failed to create Direct3D 12 Device. This "
       "application requires graphics card with FEATURE LEVEL 11.1 support. "
       "Please update your driver and try again.",
       "DirectX 12 initialization error",
@@ -183,7 +211,7 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
     } else LOG("[gpu] Shader Model 6.6 is SUPPORTED");
 
     if (!is_supported) {
-      MessageBox(desc->window,
+      MessageBox(gpu->window,
         "Your graphics card does not support some required "
         "features. Please update your graphics driver and try again.",
         "DirectX 12 initialization error", MB_OK | MB_ICONERROR);
@@ -249,11 +277,11 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
 
   IDXGISwapChain1 *swap_chain1 = NULL;
   VHR(IDXGIFactory7_CreateSwapChainForHwnd(gpu->dxgi_factory,
-    (IUnknown *)gpu->command_queue, desc->window,
+    (IUnknown *)gpu->command_queue, gpu->window,
     &(DXGI_SWAP_CHAIN_DESC1){
       .Width = gpu->viewport_width,
       .Height = gpu->viewport_height,
-      .Format = GPU_SWAP_CHAIN_TARGET_FORMAT,
+      .Format = GPU_COLOR_TARGET_FORMAT,
       .Stereo = FALSE,
       .SampleDesc = { .Count = 1 },
       .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
@@ -269,7 +297,7 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
     &gpu->swap_chain));
   SAFE_RELEASE(swap_chain1);
 
-  VHR(IDXGIFactory7_MakeWindowAssociation(gpu->dxgi_factory, desc->window,
+  VHR(IDXGIFactory7_MakeWindowAssociation(gpu->dxgi_factory, gpu->window,
     DXGI_MWA_NO_WINDOW_CHANGES));
 
   for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
@@ -300,7 +328,7 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
   for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
     ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->swap_chain_buffers[i],
       &(D3D12_RENDER_TARGET_VIEW_DESC){
-        .Format = GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT,
+        .Format = GPU_COLOR_TARGET_VIEW_FORMAT,
         .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
       },
       (D3D12_CPU_DESCRIPTOR_HANDLE){
@@ -311,6 +339,26 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
   LOG("[gpu] Render target view (RTV) descriptor heap created "
     "(NumDescriptors: %d, DescriptorSize: %d)", GPU_MAX_RTV_DESCRIPTORS,
     gpu->rtv_dheap_descriptor_size);
+
+  gpu->color_target = NULL;
+  gpu->color_target_num_samples = desc->color_target_num_samples == 0 ? 1 :
+    desc->color_target_num_samples;
+  memcpy(gpu->color_target_clear_values, desc->color_target_clear_values,
+    sizeof(gpu->color_target_clear_values));
+
+  if (gpu->color_target_num_samples > 1) {
+    gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
+      gpu->viewport_height, gpu->color_target_num_samples,
+      gpu->color_target_clear_values);
+
+    ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->ds_target, NULL,
+      (D3D12_CPU_DESCRIPTOR_HANDLE){
+        .ptr = gpu->rtv_dheap_start.ptr + GPU_MAX_BUFFERED_FRAMES *
+          gpu->rtv_dheap_descriptor_size
+      });
+
+    LOG("[gpu] MSAA target created");
+  }
 
   //
   // DSV descriptor heap
@@ -336,15 +384,17 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
 
   gpu->ds_target = NULL;
   gpu->ds_target_format = desc->ds_target_format;
-  gpu->ds_target_clear_value = desc->ds_target_clear_value;
+  gpu->ds_target_clear_values = desc->ds_target_clear_values;
 
   if (gpu->ds_target_format != DXGI_FORMAT_UNKNOWN) {
     gpu->ds_target = create_depth_stencil_target(gpu->device,
       gpu->viewport_width, gpu->viewport_height, gpu->ds_target_format,
-      gpu->ds_target_clear_value);
+      gpu->color_target_num_samples, gpu->ds_target_clear_values);
 
     ID3D12Device14_CreateDepthStencilView(gpu->device, gpu->ds_target, NULL,
       gpu->dsv_dheap_start);
+
+    LOG("[gpu] Depth-stencil target created");
   }
 
   //
@@ -441,7 +491,16 @@ gpu_deinit_context(GpuContext *gpu)
 }
 
 void
-gpu_finish_commands(GpuContext *gpu)
+gpu_execute_command_lists(GpuContext *gpu)
+{
+  assert(gpu);
+  // For now, just execute our single command list.
+  ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
+    (ID3D12CommandList **)&gpu->command_list);
+}
+
+void
+gpu_finish_command_lists(GpuContext *gpu)
 {
   assert(gpu && gpu->device);
   gpu->frame_fence_counter += 1;
@@ -454,6 +513,47 @@ gpu_finish_commands(GpuContext *gpu)
 
   WaitForSingleObject(gpu->frame_fence_event, INFINITE);
   gpu->upload_heaps[gpu->frame_index].size = 0;
+}
+
+ID3D12GraphicsCommandList10 *
+gpu_begin_command_list(GpuContext *gpu)
+{
+  assert(gpu);
+
+  ID3D12CommandAllocator *cmdalloc = gpu->command_allocators[gpu->frame_index];
+  ID3D12GraphicsCommandList10 *cmdlist = gpu->command_list;
+
+  VHR(ID3D12CommandAllocator_Reset(cmdalloc));
+  VHR(ID3D12GraphicsCommandList10_Reset(cmdlist, cmdalloc, NULL));
+
+  ID3D12GraphicsCommandList10_SetDescriptorHeaps(cmdlist, 1, &gpu->shader_dheap);
+
+  ID3D12GraphicsCommandList10_RSSetViewports(cmdlist, 1,
+    &(D3D12_VIEWPORT){
+      .TopLeftX = 0.0f,
+      .TopLeftY = 0.0f,
+      .Width = (float)gpu->viewport_width,
+      .Height = (float)gpu->viewport_height,
+      .MinDepth = 0.0f,
+      .MaxDepth = 1.0f,
+    });
+  ID3D12GraphicsCommandList10_RSSetScissorRects(cmdlist, 1,
+    &(D3D12_RECT){
+      .left = 0,
+      .top = 0,
+      .right = gpu->viewport_width,
+      .bottom = gpu->viewport_height,
+    });
+
+  return cmdlist;
+}
+
+void
+gpu_end_command_list(GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist)
+{
+  assert(gpu && cmdlist);
+  // For now, just close the command list.
+  VHR(ID3D12GraphicsCommandList10_Close(cmdlist));
 }
 
 void
@@ -513,7 +613,7 @@ gpu_update_context(GpuContext *gpu)
     LOG("[gpu] Window resized to %ldx%ld", current_rect.right,
       current_rect.bottom);
 
-    gpu_finish_commands(gpu);
+    gpu_finish_command_lists(gpu);
 
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
       SAFE_RELEASE(gpu->swap_chain_buffers[i]);
@@ -530,7 +630,7 @@ gpu_update_context(GpuContext *gpu)
       ID3D12Device14_CreateRenderTargetView(gpu->device,
         gpu->swap_chain_buffers[i],
         &(D3D12_RENDER_TARGET_VIEW_DESC){
-          .Format = GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT,
+          .Format = GPU_COLOR_TARGET_VIEW_FORMAT,
           .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
         },
         (D3D12_CPU_DESCRIPTOR_HANDLE){
@@ -542,15 +642,33 @@ gpu_update_context(GpuContext *gpu)
     gpu->viewport_height = current_rect.bottom;
     gpu->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gpu->swap_chain);
 
+    if (gpu->color_target) {
+      SAFE_RELEASE(gpu->color_target);
+
+      gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
+        gpu->viewport_height, gpu->color_target_num_samples,
+        gpu->color_target_clear_values);
+
+      ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->ds_target, NULL,
+        (D3D12_CPU_DESCRIPTOR_HANDLE){
+          .ptr = gpu->rtv_dheap_start.ptr + GPU_MAX_BUFFERED_FRAMES *
+            gpu->rtv_dheap_descriptor_size
+        });
+
+      LOG("[gpu] MSAA target re-created");
+    }
+
     if (gpu->ds_target) {
       SAFE_RELEASE(gpu->ds_target);
 
       gpu->ds_target = create_depth_stencil_target(gpu->device,
         gpu->viewport_width, gpu->viewport_height, gpu->ds_target_format,
-        gpu->ds_target_clear_value);
+        gpu->color_target_num_samples, gpu->ds_target_clear_values);
 
       ID3D12Device14_CreateDepthStencilView(gpu->device, gpu->ds_target, NULL,
         gpu->dsv_dheap_start);
+
+      LOG("[gpu] Depth-stencil target re-created");
     }
 
     return GpuContextState_WindowResized;
@@ -568,7 +686,7 @@ gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size)
   if (cpu_addr == NULL) {
     LOG("[gpu] Upload memory exhausted - waiting for the GPU... "
       "(command list state is lost!).");
-    gpu_finish_commands(gpu);
+    gpu_finish_command_lists(gpu);
     // TODO: begin_command_list()
     cpu_addr = umh_alloc(&gpu->upload_heaps[gpu->frame_index], size);
     assert(cpu_addr);

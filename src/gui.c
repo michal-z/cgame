@@ -66,9 +66,7 @@ gui_init_add_font(GuiContext *gui, const char *font_file, float font_height)
 void
 gui_init_end(GuiContext *gui, GpuContext *gpu)
 {
-  VHR(ID3D12CommandAllocator_Reset(gpu->command_allocators[0]));
-  VHR(ID3D12GraphicsCommandList10_Reset(gpu->command_list,
-    gpu->command_allocators[0], NULL));
+  ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
 
   {
     int font_w, font_h;
@@ -116,7 +114,7 @@ gui_init_end(GuiContext *gui, GpuContext *gpu)
         (uint8_t *)font_image + y * (font_w * 4), font_w * 4);
     }
 
-    ID3D12GraphicsCommandList10_CopyTextureRegion(gpu->command_list,
+    ID3D12GraphicsCommandList10_CopyTextureRegion(cmdlist,
       &(D3D12_TEXTURE_COPY_LOCATION){
         .pResource = gui->font_texture,
         .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
@@ -130,7 +128,7 @@ gui_init_end(GuiContext *gui, GpuContext *gpu)
       },
       NULL);
 
-    ID3D12GraphicsCommandList10_Barrier(gpu->command_list, 1,
+    ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
       &(D3D12_BARRIER_GROUP){
         .Type = D3D12_BARRIER_TYPE_TEXTURE,
         .NumBarriers = 1,
@@ -146,13 +144,12 @@ gui_init_end(GuiContext *gui, GpuContext *gpu)
       });
   }
 
-  VHR(ID3D12GraphicsCommandList10_Close(gpu->command_list));
-  ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
-    (ID3D12CommandList **)&gpu->command_list);
-  gpu_finish_commands(gpu);
+  gpu_end_command_list(gpu, cmdlist);
 
-  nk_font_atlas_end(&gui->atlas, nk_handle_id(0),
-    &gui->tex_null);
+  gpu_execute_command_lists(gpu);
+  gpu_finish_command_lists(gpu);
+
+  nk_font_atlas_end(&gui->atlas, nk_handle_id(0), &gui->tex_null);
 }
 
 void

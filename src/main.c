@@ -245,7 +245,7 @@ game_init(GameState *game_state)
     &(GpuContextDesc){
       .window = window,
       .ds_target_format = DEPTH_STENCIL_TARGET_FORMAT,
-      .ds_target_clear_value = { .Depth = 1.0f, .Stencil = 0 },
+      .ds_target_clear_values = { .Depth = 1.0f, .Stencil = 0 },
     });
 
   GpuContext *gpu = &game_state->gpu_context;
@@ -286,7 +286,7 @@ game_init(GameState *game_state)
       },
       .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
       .NumRenderTargets = 1,
-      .RTVFormats = { GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT },
+      .RTVFormats = { GPU_COLOR_TARGET_VIEW_FORMAT },
       .DSVFormat = DEPTH_STENCIL_TARGET_FORMAT,
       .DepthStencilState = {
         .DepthEnable = TRUE,
@@ -330,7 +330,7 @@ game_init(GameState *game_state)
       },
       .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
       .NumRenderTargets = 1,
-      .RTVFormats = { GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT },
+      .RTVFormats = { GPU_COLOR_TARGET_VIEW_FORMAT },
       .SampleDesc = { .Count = 1 },
       .InputLayout = {
         .NumElements = 3,
@@ -422,9 +422,7 @@ game_init(GameState *game_state)
   // Meshes
   //
   {
-    VHR(ID3D12CommandAllocator_Reset(gpu->command_allocators[0]));
-    VHR(ID3D12GraphicsCommandList10_Reset(gpu->command_list,
-      gpu->command_allocators[0], NULL));
+    ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
 
     const char *mesh_filenames[MESH_MAX] = {NULL};
     mesh_filenames[MESH_SQUARE_1_INSET_01] =
@@ -445,7 +443,7 @@ game_init(GameState *game_state)
 
       load_mesh(mesh_filenames[i], NULL, (CgVertex *)upload.cpu_addr);
 
-      ID3D12GraphicsCommandList10_CopyBufferRegion(gpu->command_list,
+      ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist,
         game_state->static_geo_buffer, total_num_points * sizeof(CgVertex),
         upload.buffer, upload.buffer_offset, upload.size);
 
@@ -456,11 +454,10 @@ game_init(GameState *game_state)
       game_state->meshes_num += 1;
       total_num_points += num_points;
     }
+    gpu_end_command_list(gpu, cmdlist);
 
-    VHR(ID3D12GraphicsCommandList10_Close(gpu->command_list));
-    ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
-      (ID3D12CommandList **)&gpu->command_list);
-    gpu_finish_commands(gpu);
+    gpu_execute_command_lists(gpu);
+    gpu_finish_command_lists(gpu);
   }
 
   //
@@ -491,7 +488,7 @@ game_deinit(GameState *game_state)
 {
   GpuContext *gpu = &game_state->gpu_context;
 
-  gpu_finish_commands(gpu);
+  gpu_finish_command_lists(gpu);
 
   gui_deinit(&game_state->gui_context);
 
@@ -561,31 +558,7 @@ static void
 game_draw(GameState *game_state)
 {
   GpuContext *gpu = &game_state->gpu_context;
-  ID3D12CommandAllocator *cmdalloc = gpu->command_allocators[gpu->frame_index];
-  ID3D12GraphicsCommandList10 *cmdlist = gpu->command_list;
-
-  VHR(ID3D12CommandAllocator_Reset(cmdalloc));
-  VHR(ID3D12GraphicsCommandList10_Reset(cmdlist, cmdalloc, NULL));
-
-  ID3D12GraphicsCommandList10_SetDescriptorHeaps(cmdlist, 1, &gpu->shader_dheap);
-
-  ID3D12GraphicsCommandList10_RSSetViewports(cmdlist, 1,
-    &(D3D12_VIEWPORT){
-      .TopLeftX = 0.0f,
-      .TopLeftY = 0.0f,
-      .Width = (float)gpu->viewport_width,
-      .Height = (float)gpu->viewport_height,
-      .MinDepth = 0.0f,
-      .MaxDepth = 1.0f,
-    });
-
-  ID3D12GraphicsCommandList10_RSSetScissorRects(cmdlist, 1,
-    &(D3D12_RECT){
-      .left = 0,
-      .top = 0,
-      .right = gpu->viewport_width,
-      .bottom = gpu->viewport_height,
-    });
+  ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
 
   D3D12_CPU_DESCRIPTOR_HANDLE rt_descriptor = {
     .ptr = gpu->rtv_dheap_start.ptr + gpu->frame_index *
@@ -707,11 +680,9 @@ game_draw(GameState *game_state)
       },
     });
 
-  VHR(ID3D12GraphicsCommandList10_Close(cmdlist));
+  gpu_end_command_list(gpu, cmdlist);
 
-  ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
-    (ID3D12CommandList **)&cmdlist);
-
+  gpu_execute_command_lists(gpu);
   gpu_present_frame(gpu);
 }
 

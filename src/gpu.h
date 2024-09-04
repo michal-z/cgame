@@ -7,8 +7,8 @@
 
 #define GPU_ENABLE_VSYNC 0
 
-#define GPU_SWAP_CHAIN_TARGET_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
-#define GPU_SWAP_CHAIN_TARGET_VIEW_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
+#define GPU_COLOR_TARGET_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
+#define GPU_COLOR_TARGET_VIEW_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
 
 #define GPU_MAX_RTV_DESCRIPTORS 64
 #define GPU_MAX_DSV_DESCRIPTORS 64
@@ -43,7 +43,9 @@ struct GpuUploadMemoryHeap
 struct GpuContextDesc
 {
   HWND window;
-  D3D12_DEPTH_STENCIL_VALUE ds_target_clear_value;
+  uint32_t color_target_num_samples;
+  float color_target_clear_values[4];
+  D3D12_DEPTH_STENCIL_VALUE ds_target_clear_values;
   DXGI_FORMAT ds_target_format;
 };
 
@@ -74,9 +76,13 @@ struct GpuContext
   uint32_t swap_chain_present_interval;
   ID3D12Resource *swap_chain_buffers[GPU_MAX_BUFFERED_FRAMES];
 
+  ID3D12Resource *color_target; // NULL if color_target_num_samples == 1
+  uint32_t color_target_num_samples;
+  float color_target_clear_values[4];
+
   ID3D12Resource *ds_target;
   DXGI_FORMAT ds_target_format;
-  D3D12_DEPTH_STENCIL_VALUE ds_target_clear_value;
+  D3D12_DEPTH_STENCIL_VALUE ds_target_clear_values;
 
   ID3D12DescriptorHeap *rtv_dheap;
   D3D12_CPU_DESCRIPTOR_HANDLE rtv_dheap_start;
@@ -111,6 +117,11 @@ struct GpuUploadBufferRegion
 void gpu_init_context(GpuContext *gpu, GpuContextDesc *desc);
 void gpu_deinit_context(GpuContext *gpu);
 GpuContextState gpu_update_context(GpuContext *gpu);
-void gpu_finish_commands(GpuContext *gpu);
 void gpu_present_frame(GpuContext *gpu);
+
+ID3D12GraphicsCommandList10 *gpu_begin_command_list(GpuContext *gpu);
+void gpu_end_command_list(GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist);
+void gpu_execute_command_lists(GpuContext *gpu);
+void gpu_finish_command_lists(GpuContext *gpu);
+
 GpuUploadBufferRegion gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size);
