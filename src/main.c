@@ -182,10 +182,6 @@ load_mesh(const char *filename, uint32_t *points_num, CgVertex *points)
   CloseHandle(file);
 }
 
-#define PSO_FIRST 0
-#define PSO_GUI 1
-#define PSO_MAX 16
-
 #define OBJ_MAX 1000
 
 #define FONT_ROBOTO_16 0
