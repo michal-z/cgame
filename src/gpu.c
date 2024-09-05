@@ -110,6 +110,8 @@ void
 gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
 {
   assert(gpu && gpu->device == NULL && desc);
+  assert(desc->num_msaa_samples == 2 || desc->num_msaa_samples == 4 ||
+    desc->num_msaa_samples == 8);
 
   RECT rect = {0};
   GetClientRect(desc->window, &rect);
@@ -329,23 +331,19 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
     "(NumDescriptors: %d, DescriptorSize: %d)", GPU_MAX_RTV_DESCRIPTORS,
     gpu->rtv_dheap_descriptor_size);
 
-  gpu->color_target = NULL;
   gpu->color_target_descriptor = gpu->rtv_dheap_start;
-  gpu->num_msaa_samples = desc->num_msaa_samples <= 1 ? 2 :
-    desc->num_msaa_samples;
+  gpu->num_msaa_samples = desc->num_msaa_samples;
   memcpy(gpu->color_target_clear_values, desc->color_target_clear_values,
     sizeof(gpu->color_target_clear_values));
 
-  if (gpu->num_msaa_samples > 1) {
-    gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
-      gpu->viewport_height, gpu->num_msaa_samples,
-      gpu->color_target_clear_values);
+  gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
+    gpu->viewport_height, gpu->num_msaa_samples,
+    gpu->color_target_clear_values);
 
-    ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->color_target, NULL,
-      gpu->color_target_descriptor);
+  ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->color_target, NULL,
+    gpu->color_target_descriptor);
 
-    LOG("[gpu] MSAA target created");
-  }
+  LOG("[gpu] MSAA target created");
 
   //
   // DSV descriptor heap
@@ -678,18 +676,17 @@ gpu_update_context(GpuContext *gpu)
     gpu->viewport_height = current_rect.bottom;
     gpu->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gpu->swap_chain);
 
-    if (gpu->color_target) {
-      SAFE_RELEASE(gpu->color_target);
+    assert(gpu->color_target);
+    SAFE_RELEASE(gpu->color_target);
 
-      gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
-        gpu->viewport_height, gpu->num_msaa_samples,
-        gpu->color_target_clear_values);
+    gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
+      gpu->viewport_height, gpu->num_msaa_samples,
+      gpu->color_target_clear_values);
 
-      ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->color_target, NULL,
-        gpu->color_target_descriptor);
+    ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->color_target, NULL,
+      gpu->color_target_descriptor);
 
-      LOG("[gpu] MSAA target re-created");
-    }
+    LOG("[gpu] MSAA target re-created");
 
     if (gpu->ds_target) {
       SAFE_RELEASE(gpu->ds_target);

@@ -186,8 +186,6 @@ load_mesh(const char *filename, uint32_t *points_num, CgVertex *points)
 #define PSO_GUI 1
 #define PSO_MAX 16
 
-#define STATIC_GEO_BUFFER_MAX_VERTS (100 * 1000)
-
 #define OBJ_MAX 1000
 
 #define FONT_ROBOTO_16 0
@@ -198,8 +196,8 @@ load_mesh(const char *filename, uint32_t *points_num, CgVertex *points)
 #define MESH_CIRCLE_1_INSET_01 1
 #define MESH_MAX 32
 
+#define STATIC_GEO_BUFFER_MAX_VERTS (100 * 1000)
 #define DEPTH_STENCIL_TARGET_FORMAT DXGI_FORMAT_D32_FLOAT
-
 #define CLEAR_COLOR { 0.2f, 0.4f, 0.8f, 1.0f }
 #define NUM_MSAA_SAMPLES 4
 
