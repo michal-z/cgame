@@ -158,7 +158,7 @@ load_mesh(const char *filename, uint32_t *points_num, CgVertex *points)
 {
   assert(filename && (points_num || points));
 
-  HANDLE file = CreateFile(filename, GENERIC_READ, 0, NULL, OPEN_EXISTING, 
+  HANDLE file = CreateFile(filename, GENERIC_READ, 0, NULL, OPEN_EXISTING,
     FILE_ATTRIBUTE_NORMAL, NULL);
   if (file == NULL)
     VHR(HRESULT_FROM_WIN32(GetLastError()));
