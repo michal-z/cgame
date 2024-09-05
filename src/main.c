@@ -200,6 +200,9 @@ load_mesh(const char *filename, uint32_t *points_num, CgVertex *points)
 
 #define DEPTH_STENCIL_TARGET_FORMAT DXGI_FORMAT_D32_FLOAT
 
+#define CLEAR_COLOR { 0.2f, 0.4f, 0.8f, 1.0f }
+#define NUM_MSAA_SAMPLES 4
+
 typedef struct GameState GameState;
 typedef struct Mesh Mesh;
 
@@ -244,8 +247,10 @@ game_init(GameState *game_state)
   gpu_init_context(&game_state->gpu_context,
     &(GpuContextDesc){
       .window = window,
+      .color_target_clear_values = CLEAR_COLOR,
       .ds_target_format = DEPTH_STENCIL_TARGET_FORMAT,
       .ds_target_clear_values = { .Depth = 1.0f, .Stencil = 0 },
+      .num_msaa_samples = NUM_MSAA_SAMPLES,
     });
 
   GpuContext *gpu = &game_state->gpu_context;
@@ -286,14 +291,14 @@ game_init(GameState *game_state)
       },
       .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
       .NumRenderTargets = 1,
-      .RTVFormats = { GPU_COLOR_TARGET_VIEW_FORMAT },
+      .RTVFormats = { GPU_COLOR_TARGET_FORMAT },
       .DSVFormat = DEPTH_STENCIL_TARGET_FORMAT,
       .DepthStencilState = {
         .DepthEnable = TRUE,
         .DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL,
         .DepthFunc = D3D12_COMPARISON_FUNC_LESS,
       },
-      .SampleDesc = { .Count = 1 },
+      .SampleDesc = { .Count = NUM_MSAA_SAMPLES },
     },
     &IID_ID3D12PipelineState, &game_state->pso[PSO_FIRST]));
 
@@ -330,8 +335,8 @@ game_init(GameState *game_state)
       },
       .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
       .NumRenderTargets = 1,
-      .RTVFormats = { GPU_COLOR_TARGET_VIEW_FORMAT },
-      .SampleDesc = { .Count = 1 },
+      .RTVFormats = { GPU_COLOR_TARGET_FORMAT },
+      .SampleDesc = { .Count = NUM_MSAA_SAMPLES },
       .InputLayout = {
         .NumElements = 3,
         .pInputElementDescs = (D3D12_INPUT_ELEMENT_DESC[]){
@@ -513,7 +518,7 @@ game_update(GameState *game_state)
     CgObject *obj = &game_state->objects[0];
     obj->position[0] += dt;
     obj->position[0] = fmodf(obj->position[0], 8.0f);
-    //obj->rotation += 0.5f * dt;
+    obj->rotation += 0.5f * dt;
   }
 
   game_state->objects[1].rotation += 0.5f * dt;
@@ -560,26 +565,10 @@ game_draw(GameState *game_state)
   GpuContext *gpu = &game_state->gpu_context;
   ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
 
-  D3D12_CPU_DESCRIPTOR_HANDLE rt_descriptor = {
-    .ptr = gpu->rtv_dheap_start.ptr + gpu->frame_index *
-      gpu->rtv_dheap_descriptor_size
-  };
-
-  ID3D12GraphicsCommandList10_Barrier(cmdlist, 2,
-    (D3D12_BARRIER_GROUP[]){
-      { .Type = D3D12_BARRIER_TYPE_TEXTURE,
-        .NumBarriers = 1,
-        .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
-          .SyncBefore = D3D12_BARRIER_SYNC_NONE,
-          .SyncAfter = D3D12_BARRIER_SYNC_RENDER_TARGET,
-          .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
-          .AccessAfter = D3D12_BARRIER_ACCESS_RENDER_TARGET,
-          .LayoutBefore = D3D12_BARRIER_LAYOUT_PRESENT,
-          .LayoutAfter = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-          .pResource = gpu->swap_chain_buffers[gpu->frame_index],
-        },
-      },
-      { .Type = D3D12_BARRIER_TYPE_BUFFER,
+  {
+    ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+      &(D3D12_BARRIER_GROUP){
+        .Type = D3D12_BARRIER_TYPE_BUFFER,
         .NumBarriers = 1,
         .pBufferBarriers = &(D3D12_BUFFER_BARRIER){
           .SyncBefore = D3D12_BARRIER_SYNC_NONE,
@@ -589,10 +578,8 @@ game_draw(GameState *game_state)
           .pResource = game_state->object_buffer,
           .Size = UINT64_MAX,
         },
-      },
-    });
+      });
 
-  {
     GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
       game_state->objects_num * sizeof(CgObject));
 
@@ -620,12 +607,12 @@ game_draw(GameState *game_state)
       });
   }
 
-  ID3D12GraphicsCommandList10_OMSetRenderTargets(cmdlist, 1, &rt_descriptor,
-    TRUE, &gpu->dsv_dheap_start);
-  ID3D12GraphicsCommandList10_ClearRenderTargetView(cmdlist, rt_descriptor,
-    (float[4]){ 0.2f, 0.4f, 0.8f, 1.0f }, 0, NULL);
-  ID3D12GraphicsCommandList10_ClearDepthStencilView(cmdlist, gpu->dsv_dheap_start,
-    D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
+  ID3D12GraphicsCommandList10_OMSetRenderTargets(cmdlist, 1,
+    &gpu->color_target_descriptor, TRUE, &gpu->ds_target_descriptor);
+  ID3D12GraphicsCommandList10_ClearRenderTargetView(cmdlist,
+    gpu->color_target_descriptor, (float[4])CLEAR_COLOR, 0, NULL);
+  ID3D12GraphicsCommandList10_ClearDepthStencilView(cmdlist,
+    gpu->ds_target_descriptor, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
 
   ID3D12GraphicsCommandList10_IASetPrimitiveTopology(cmdlist,
     D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -665,23 +652,7 @@ game_draw(GameState *game_state)
   gui_draw(&game_state->gui_context, gpu, cmdlist, game_state->pso[PSO_GUI],
     game_state->pso_rs[PSO_GUI]);
 
-  // TODO:
-  //gpu_resolve_render_target(gpu, cmdlist);
-
-  ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
-    &(D3D12_BARRIER_GROUP){
-      .Type = D3D12_BARRIER_TYPE_TEXTURE,
-      .NumBarriers = 1,
-      .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
-        .SyncBefore = D3D12_BARRIER_SYNC_RENDER_TARGET,
-        .SyncAfter = D3D12_BARRIER_SYNC_NONE,
-        .AccessBefore = D3D12_BARRIER_ACCESS_RENDER_TARGET,
-        .AccessAfter = D3D12_BARRIER_ACCESS_NO_ACCESS,
-        .LayoutBefore = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        .LayoutAfter = D3D12_BARRIER_LAYOUT_PRESENT,
-        .pResource = gpu->swap_chain_buffers[gpu->frame_index],
-      },
-    });
+  gpu_resolve_render_target(gpu, cmdlist);
 
   gpu_end_command_list(gpu, cmdlist);
 

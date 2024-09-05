@@ -187,7 +187,7 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
     D3D12_FEATURE_DATA_SHADER_MODEL shader_model = {
       .HighestShaderModel = D3D_HIGHEST_SHADER_MODEL
     };
-    VHR(ID3D12Device14_CheckFeatureSupport(gpu->device, 
+    VHR(ID3D12Device14_CheckFeatureSupport(gpu->device,
       D3D12_FEATURE_SHADER_MODEL,
       &shader_model, sizeof(shader_model)));
 
@@ -281,7 +281,7 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
     &(DXGI_SWAP_CHAIN_DESC1){
       .Width = gpu->viewport_width,
       .Height = gpu->viewport_height,
-      .Format = GPU_COLOR_TARGET_FORMAT,
+      .Format = GPU_SWAP_CHAIN_FORMAT,
       .Stereo = FALSE,
       .SampleDesc = { .Count = 1 },
       .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
@@ -321,41 +321,28 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
   ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(gpu->rtv_dheap,
     &gpu->rtv_dheap_start);
 
-  gpu->rtv_dheap_descriptor_size = 
-    ID3D12Device14_GetDescriptorHandleIncrementSize(gpu->device, 
+  gpu->rtv_dheap_descriptor_size =
+    ID3D12Device14_GetDescriptorHandleIncrementSize(gpu->device,
       D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-  for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-    ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->swap_chain_buffers[i],
-      &(D3D12_RENDER_TARGET_VIEW_DESC){
-        .Format = GPU_COLOR_TARGET_VIEW_FORMAT,
-        .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-      },
-      (D3D12_CPU_DESCRIPTOR_HANDLE){
-        .ptr = gpu->rtv_dheap_start.ptr + i * gpu->rtv_dheap_descriptor_size
-      });
-  }
 
   LOG("[gpu] Render target view (RTV) descriptor heap created "
     "(NumDescriptors: %d, DescriptorSize: %d)", GPU_MAX_RTV_DESCRIPTORS,
     gpu->rtv_dheap_descriptor_size);
 
   gpu->color_target = NULL;
-  gpu->color_target_num_samples = desc->color_target_num_samples == 0 ? 1 :
-    desc->color_target_num_samples;
+  gpu->color_target_descriptor = gpu->rtv_dheap_start;
+  gpu->num_msaa_samples = desc->num_msaa_samples <= 1 ? 2 :
+    desc->num_msaa_samples;
   memcpy(gpu->color_target_clear_values, desc->color_target_clear_values,
     sizeof(gpu->color_target_clear_values));
 
-  if (gpu->color_target_num_samples > 1) {
+  if (gpu->num_msaa_samples > 1) {
     gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
-      gpu->viewport_height, gpu->color_target_num_samples,
+      gpu->viewport_height, gpu->num_msaa_samples,
       gpu->color_target_clear_values);
 
-    ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->ds_target, NULL,
-      (D3D12_CPU_DESCRIPTOR_HANDLE){
-        .ptr = gpu->rtv_dheap_start.ptr + GPU_MAX_BUFFERED_FRAMES *
-          gpu->rtv_dheap_descriptor_size
-      });
+    ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->color_target, NULL,
+      gpu->color_target_descriptor);
 
     LOG("[gpu] MSAA target created");
   }
@@ -374,8 +361,8 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
   ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(gpu->dsv_dheap,
     &gpu->dsv_dheap_start);
 
-  gpu->dsv_dheap_descriptor_size = 
-    ID3D12Device14_GetDescriptorHandleIncrementSize(gpu->device, 
+  gpu->dsv_dheap_descriptor_size =
+    ID3D12Device14_GetDescriptorHandleIncrementSize(gpu->device,
       D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
   LOG("[gpu] Depth-stencil view (DSV) descriptor heap created "
@@ -383,16 +370,17 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
     GPU_MAX_DSV_DESCRIPTORS, gpu->dsv_dheap_descriptor_size);
 
   gpu->ds_target = NULL;
+  gpu->ds_target_descriptor = gpu->dsv_dheap_start;
   gpu->ds_target_format = desc->ds_target_format;
   gpu->ds_target_clear_values = desc->ds_target_clear_values;
 
   if (gpu->ds_target_format != DXGI_FORMAT_UNKNOWN) {
     gpu->ds_target = create_depth_stencil_target(gpu->device,
       gpu->viewport_width, gpu->viewport_height, gpu->ds_target_format,
-      gpu->color_target_num_samples, gpu->ds_target_clear_values);
+      gpu->num_msaa_samples, gpu->ds_target_clear_values);
 
     ID3D12Device14_CreateDepthStencilView(gpu->device, gpu->ds_target, NULL,
-      gpu->dsv_dheap_start);
+      gpu->ds_target_descriptor);
 
     LOG("[gpu] Depth-stencil target created");
   }
@@ -414,7 +402,7 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
   ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(gpu->shader_dheap,
     &gpu->shader_dheap_start_gpu);
 
-  gpu->shader_dheap_descriptor_size = 
+  gpu->shader_dheap_descriptor_size =
     ID3D12Device14_GetDescriptorHandleIncrementSize(gpu->device,
       D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
@@ -461,8 +449,9 @@ gpu_deinit_context(GpuContext *gpu)
   }
   SAFE_RELEASE(gpu->frame_fence);
   SAFE_RELEASE(gpu->shader_dheap);
-  SAFE_RELEASE(gpu->rtv_dheap);
+  SAFE_RELEASE(gpu->color_target);
   SAFE_RELEASE(gpu->ds_target);
+  SAFE_RELEASE(gpu->rtv_dheap);
   SAFE_RELEASE(gpu->dsv_dheap);
   for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
     SAFE_RELEASE(gpu->swap_chain_buffers[i]);
@@ -557,6 +546,65 @@ gpu_end_command_list(GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist)
 }
 
 void
+gpu_resolve_render_target(GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist)
+{
+  assert(gpu && cmdlist);
+  assert(gpu->color_target && gpu->num_msaa_samples > 1);
+
+  ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+    &(D3D12_BARRIER_GROUP){
+      .Type = D3D12_BARRIER_TYPE_TEXTURE,
+      .NumBarriers = 2,
+      .pTextureBarriers = (D3D12_TEXTURE_BARRIER[]){
+        { .SyncBefore = D3D12_BARRIER_SYNC_NONE,
+          .SyncAfter = D3D12_BARRIER_SYNC_RESOLVE,
+          .AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
+          .AccessAfter = D3D12_BARRIER_ACCESS_RESOLVE_DEST,
+          .LayoutBefore = D3D12_BARRIER_LAYOUT_PRESENT,
+          .LayoutAfter = D3D12_BARRIER_LAYOUT_RESOLVE_DEST,
+          .pResource = gpu->swap_chain_buffers[gpu->frame_index],
+        },
+        { .SyncBefore = D3D12_BARRIER_SYNC_RENDER_TARGET,
+          .SyncAfter = D3D12_BARRIER_SYNC_RESOLVE,
+          .AccessBefore = D3D12_BARRIER_ACCESS_RENDER_TARGET,
+          .AccessAfter = D3D12_BARRIER_ACCESS_RESOLVE_SOURCE,
+          .LayoutBefore = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+          .LayoutAfter = D3D12_BARRIER_LAYOUT_RESOLVE_SOURCE,
+          .pResource = gpu->color_target,
+        },
+      },
+    });
+
+  ID3D12GraphicsCommandList10_ResolveSubresource(cmdlist,
+    gpu->swap_chain_buffers[gpu->frame_index], 0, gpu->color_target, 0,
+    GPU_COLOR_TARGET_FORMAT);
+
+  ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+    &(D3D12_BARRIER_GROUP){
+      .Type = D3D12_BARRIER_TYPE_TEXTURE,
+      .NumBarriers = 2,
+      .pTextureBarriers = (D3D12_TEXTURE_BARRIER[]){
+        { .SyncBefore = D3D12_BARRIER_SYNC_RESOLVE,
+          .SyncAfter = D3D12_BARRIER_SYNC_NONE,
+          .AccessBefore = D3D12_BARRIER_ACCESS_RESOLVE_DEST,
+          .AccessAfter = D3D12_BARRIER_ACCESS_NO_ACCESS,
+          .LayoutBefore = D3D12_BARRIER_LAYOUT_RESOLVE_DEST,
+          .LayoutAfter = D3D12_BARRIER_LAYOUT_PRESENT,
+          .pResource = gpu->swap_chain_buffers[gpu->frame_index],
+        },
+        { .SyncBefore = D3D12_BARRIER_SYNC_RESOLVE,
+          .SyncAfter = D3D12_BARRIER_SYNC_NONE,
+          .AccessBefore = D3D12_BARRIER_ACCESS_RESOLVE_SOURCE,
+          .AccessAfter = D3D12_BARRIER_ACCESS_NO_ACCESS,
+          .LayoutBefore = D3D12_BARRIER_LAYOUT_RESOLVE_SOURCE,
+          .LayoutAfter = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+          .pResource = gpu->color_target,
+        },
+      },
+    });
+}
+
+void
 gpu_present_frame(GpuContext *gpu)
 {
   assert(gpu && gpu->device);
@@ -626,18 +674,6 @@ gpu_update_context(GpuContext *gpu)
         &gpu->swap_chain_buffers[i]));
     }
 
-    for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
-      ID3D12Device14_CreateRenderTargetView(gpu->device,
-        gpu->swap_chain_buffers[i],
-        &(D3D12_RENDER_TARGET_VIEW_DESC){
-          .Format = GPU_COLOR_TARGET_VIEW_FORMAT,
-          .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-        },
-        (D3D12_CPU_DESCRIPTOR_HANDLE){
-          .ptr = gpu->rtv_dheap_start.ptr + i * gpu->rtv_dheap_descriptor_size
-        });
-    }
-
     gpu->viewport_width = current_rect.right;
     gpu->viewport_height = current_rect.bottom;
     gpu->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gpu->swap_chain);
@@ -646,14 +682,11 @@ gpu_update_context(GpuContext *gpu)
       SAFE_RELEASE(gpu->color_target);
 
       gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
-        gpu->viewport_height, gpu->color_target_num_samples,
+        gpu->viewport_height, gpu->num_msaa_samples,
         gpu->color_target_clear_values);
 
-      ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->ds_target, NULL,
-        (D3D12_CPU_DESCRIPTOR_HANDLE){
-          .ptr = gpu->rtv_dheap_start.ptr + GPU_MAX_BUFFERED_FRAMES *
-            gpu->rtv_dheap_descriptor_size
-        });
+      ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->color_target, NULL,
+        gpu->color_target_descriptor);
 
       LOG("[gpu] MSAA target re-created");
     }
@@ -663,10 +696,10 @@ gpu_update_context(GpuContext *gpu)
 
       gpu->ds_target = create_depth_stencil_target(gpu->device,
         gpu->viewport_width, gpu->viewport_height, gpu->ds_target_format,
-        gpu->color_target_num_samples, gpu->ds_target_clear_values);
+        gpu->num_msaa_samples, gpu->ds_target_clear_values);
 
       ID3D12Device14_CreateDepthStencilView(gpu->device, gpu->ds_target, NULL,
-        gpu->dsv_dheap_start);
+        gpu->ds_target_descriptor);
 
       LOG("[gpu] Depth-stencil target re-created");
     }

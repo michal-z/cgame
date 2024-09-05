@@ -70,7 +70,7 @@ gui_init_end(GuiContext *gui, GpuContext *gpu)
 
   {
     int font_w, font_h;
-    const void *font_image = nk_font_atlas_bake(&gui->atlas, &font_w, &font_h, 
+    const void *font_image = nk_font_atlas_bake(&gui->atlas, &font_w, &font_h,
       NK_FONT_ATLAS_RGBA32);
     assert(font_image);
     LOG("[gui] Font texture dimension: %d x %d", font_w, font_h);
@@ -225,9 +225,9 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist,
       });
   }
 
-  ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->vertex_buffer, 0, 
+  ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->vertex_buffer, 0,
     upload_vb.buffer, upload_vb.buffer_offset, MAX_VERTEX_BUFFER);
-  ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->index_buffer, 0, 
+  ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->index_buffer, 0,
     upload_ib.buffer, upload_ib.buffer_offset, MAX_INDEX_BUFFER);
 
   ID3D12GraphicsCommandList10_Barrier(gpu->command_list, 1,
