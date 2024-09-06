@@ -287,7 +287,7 @@ game_init(GameState *game_state)
       .SampleMask = 0xffffffff,
       .RasterizerState = {
         .FillMode = D3D12_FILL_MODE_SOLID,
-        .CullMode = D3D12_CULL_MODE_NONE,
+        .CullMode = D3D12_CULL_MODE_BACK,
       },
       .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
       .NumRenderTargets = 1,
@@ -330,7 +330,7 @@ game_init(GameState *game_state)
       .SampleMask = UINT_MAX,
       .RasterizerState = {
         .FillMode = D3D12_FILL_MODE_SOLID,
-        .CullMode = D3D12_CULL_MODE_NONE,
+        .CullMode = D3D12_CULL_MODE_BACK,
         .DepthClipEnable = TRUE,
       },
       .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
@@ -431,9 +431,9 @@ game_init(GameState *game_state)
 
     const char *mesh_filenames[MESH_MAX] = {NULL};
     mesh_filenames[MESH_SQUARE_1_INSET_01] =
-      "assets/meshes/square_1_inset_01.mesh";
+      "assets/meshes/square_1m_inset_5cm.mesh";
     mesh_filenames[MESH_CIRCLE_1_INSET_01] =
-      "assets/meshes/circle_1_inset_01.mesh";
+      "assets/meshes/circle_1m_inset_5cm.mesh";
 
     uint64_t total_num_points = 0;
 
