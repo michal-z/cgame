@@ -20,6 +20,32 @@
 #define NUM_MSAA_SAMPLES 4
 #define MIN_WINDOW_SIZE 400
 
+typedef struct GameState GameState;
+typedef struct Mesh Mesh;
+
+struct Mesh
+{
+  uint32_t first_vertex;
+  uint32_t num_vertices;
+};
+
+struct GameState
+{
+  const char *name;
+  GpuContext gpu_context;
+  GuiContext gui_context;
+  ID3D12RootSignature *pso_rs[PSO_MAX];
+  ID3D12PipelineState *pso[PSO_MAX];
+  ID3D12Resource *static_geo_buffer;
+  ID3D12Resource *object_buffer;
+  struct nk_font *fonts[FONT_MAX];
+  Mesh meshes[MESH_MAX];
+  uint32_t meshes_num;
+  CgObject objects[OBJ_MAX];
+  uint32_t objects_num;
+};
+static_assert(sizeof(GameState) <= 64 * 1024);
+
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
 
@@ -202,32 +228,6 @@ load_mesh(const char *filename, uint32_t *points_num, CgVertex *points)
 
   CloseHandle(file);
 }
-
-typedef struct GameState GameState;
-typedef struct Mesh Mesh;
-
-struct Mesh
-{
-  uint32_t first_vertex;
-  uint32_t num_vertices;
-};
-
-struct GameState
-{
-  const char *name;
-  GpuContext gpu_context;
-  GuiContext gui_context;
-  ID3D12RootSignature *pso_rs[PSO_MAX];
-  ID3D12PipelineState *pso[PSO_MAX];
-  ID3D12Resource *static_geo_buffer;
-  ID3D12Resource *object_buffer;
-  struct nk_font *fonts[FONT_MAX];
-  Mesh meshes[MESH_MAX];
-  uint32_t meshes_num;
-  CgObject objects[OBJ_MAX];
-  uint32_t objects_num;
-};
-static_assert(sizeof(GameState) <= 64 * 1024);
 
 static void
 game_init(GameState *game_state)
