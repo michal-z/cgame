@@ -10,8 +10,8 @@
 #define FONT_ROBOTO_24 1
 #define FONT_MAX 4
 
-#define MESH_SQUARE_1_INSET_01 0
-#define MESH_CIRCLE_1_INSET_01 1
+#define MESH_SQUARE_1M_INSET_5CM 0
+#define MESH_CIRCLE_1M_INSET_5CM 1
 #define MESH_MAX 32
 
 #define STATIC_GEO_BUFFER_MAX_VERTS (100 * 1000)
@@ -430,9 +430,9 @@ game_init(GameState *game_state)
     ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
 
     const char *mesh_filenames[MESH_MAX] = {NULL};
-    mesh_filenames[MESH_SQUARE_1_INSET_01] =
+    mesh_filenames[MESH_SQUARE_1M_INSET_5CM] =
       "assets/meshes/square_1m_inset_5cm.mesh";
-    mesh_filenames[MESH_CIRCLE_1_INSET_01] =
+    mesh_filenames[MESH_CIRCLE_1M_INSET_5CM] =
       "assets/meshes/circle_1m_inset_5cm.mesh";
 
     uint64_t total_num_points = 0;
@@ -471,7 +471,7 @@ game_init(GameState *game_state)
   game_state->objects[game_state->objects_num++] = (CgObject){
     .position = { 0.0f, 0.0f },
     .rotation = 0.0f,
-    .mesh_index = MESH_CIRCLE_1_INSET_01,
+    .mesh_index = MESH_CIRCLE_1M_INSET_5CM,
     .colors = {
       nk_color_u32(nk_rgba_f(1.0f, 0.0f, 0.0f, 1.0f)),
       nk_color_u32(nk_rgba_f(0.0f, 0.0f, 0.0f, 1.0f)),
@@ -480,7 +480,7 @@ game_init(GameState *game_state)
   game_state->objects[game_state->objects_num++] = (CgObject){
     .position = { 7.0f, 3.0f },
     .rotation = 0.5f,
-    .mesh_index = MESH_SQUARE_1_INSET_01,
+    .mesh_index = MESH_SQUARE_1M_INSET_5CM,
     .colors = {
       nk_color_u32(nk_rgba_f(1.0f, 1.0f, 0.0f, 1.0f)),
       nk_color_u32(nk_rgba_f(0.0f, 0.0f, 0.0f, 1.0f)),
