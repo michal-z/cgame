@@ -333,12 +333,11 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
 
   gpu->color_target_descriptor = gpu->rtv_dheap_start;
   gpu->num_msaa_samples = desc->num_msaa_samples;
-  memcpy(gpu->color_target_clear_values, desc->color_target_clear_values,
-    sizeof(gpu->color_target_clear_values));
-
   gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
-    gpu->viewport_height, gpu->num_msaa_samples,
-    gpu->color_target_clear_values);
+    gpu->viewport_height, gpu->num_msaa_samples, gpu->color_target_clear);
+
+  memcpy(gpu->color_target_clear, desc->color_target_clear,
+    sizeof(gpu->color_target_clear));
 
   ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->color_target, NULL,
     gpu->color_target_descriptor);
@@ -370,12 +369,12 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
   gpu->ds_target = NULL;
   gpu->ds_target_descriptor = gpu->dsv_dheap_start;
   gpu->ds_target_format = desc->ds_target_format;
-  gpu->ds_target_clear_values = desc->ds_target_clear_values;
+  gpu->ds_target_clear = desc->ds_target_clear;
 
   if (gpu->ds_target_format != DXGI_FORMAT_UNKNOWN) {
     gpu->ds_target = create_depth_stencil_target(gpu->device,
       gpu->viewport_width, gpu->viewport_height, gpu->ds_target_format,
-      gpu->num_msaa_samples, gpu->ds_target_clear_values);
+      gpu->num_msaa_samples, gpu->ds_target_clear);
 
     ID3D12Device14_CreateDepthStencilView(gpu->device, gpu->ds_target, NULL,
       gpu->ds_target_descriptor);
@@ -680,8 +679,7 @@ gpu_update_context(GpuContext *gpu)
     SAFE_RELEASE(gpu->color_target);
 
     gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
-      gpu->viewport_height, gpu->num_msaa_samples,
-      gpu->color_target_clear_values);
+      gpu->viewport_height, gpu->num_msaa_samples, gpu->color_target_clear);
 
     ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->color_target, NULL,
       gpu->color_target_descriptor);
@@ -693,7 +691,7 @@ gpu_update_context(GpuContext *gpu)
 
       gpu->ds_target = create_depth_stencil_target(gpu->device,
         gpu->viewport_width, gpu->viewport_height, gpu->ds_target_format,
-        gpu->num_msaa_samples, gpu->ds_target_clear_values);
+        gpu->num_msaa_samples, gpu->ds_target_clear);
 
       ID3D12Device14_CreateDepthStencilView(gpu->device, gpu->ds_target, NULL,
         gpu->ds_target_descriptor);

@@ -4,6 +4,22 @@
 #include "shaders.h"
 #include "gui.h"
 
+#define OBJ_MAX 1000
+
+#define FONT_ROBOTO_16 0
+#define FONT_ROBOTO_24 1
+#define FONT_MAX 4
+
+#define MESH_SQUARE_1_INSET_01 0
+#define MESH_CIRCLE_1_INSET_01 1
+#define MESH_MAX 32
+
+#define STATIC_GEO_BUFFER_MAX_VERTS (100 * 1000)
+#define DEPTH_STENCIL_TARGET_FORMAT DXGI_FORMAT_D32_FLOAT
+#define CLEAR_COLOR { 0.2f, 0.4f, 0.8f, 1.0f }
+#define NUM_MSAA_SAMPLES 4
+#define MIN_WINDOW_SIZE 400
+
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
 
@@ -117,6 +133,11 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
         return 0;
       }
       break;
+    case WM_GETMINMAXINFO: {
+      MINMAXINFO *info = (MINMAXINFO *)lparam;
+      info->ptMinTrackSize = (POINT){ MIN_WINDOW_SIZE, MIN_WINDOW_SIZE };
+      return 0;
+    }
   }
 
   GuiContext *gui = (GuiContext *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -182,21 +203,6 @@ load_mesh(const char *filename, uint32_t *points_num, CgVertex *points)
   CloseHandle(file);
 }
 
-#define OBJ_MAX 1000
-
-#define FONT_ROBOTO_16 0
-#define FONT_ROBOTO_24 1
-#define FONT_MAX 4
-
-#define MESH_SQUARE_1_INSET_01 0
-#define MESH_CIRCLE_1_INSET_01 1
-#define MESH_MAX 32
-
-#define STATIC_GEO_BUFFER_MAX_VERTS (100 * 1000)
-#define DEPTH_STENCIL_TARGET_FORMAT DXGI_FORMAT_D32_FLOAT
-#define CLEAR_COLOR { 0.2f, 0.4f, 0.8f, 1.0f }
-#define NUM_MSAA_SAMPLES 4
-
 typedef struct GameState GameState;
 typedef struct Mesh Mesh;
 
@@ -241,9 +247,9 @@ game_init(GameState *game_state)
   gpu_init_context(&game_state->gpu_context,
     &(GpuContextDesc){
       .window = window,
-      .color_target_clear_values = CLEAR_COLOR,
+      .color_target_clear = CLEAR_COLOR,
       .ds_target_format = DEPTH_STENCIL_TARGET_FORMAT,
-      .ds_target_clear_values = { .Depth = 1.0f, .Stencil = 0 },
+      .ds_target_clear = { .Depth = 1.0f, .Stencil = 0 },
       .num_msaa_samples = NUM_MSAA_SAMPLES,
     });
 

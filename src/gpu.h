@@ -44,8 +44,8 @@ struct GpuContextDesc
 {
   HWND window;
   uint32_t num_msaa_samples;
-  float color_target_clear_values[4];
-  D3D12_DEPTH_STENCIL_VALUE ds_target_clear_values;
+  float color_target_clear[4];
+  D3D12_DEPTH_STENCIL_VALUE ds_target_clear;
   DXGI_FORMAT ds_target_format;
 };
 
@@ -78,12 +78,12 @@ struct GpuContext
 
   ID3D12Resource *color_target;
   D3D12_CPU_DESCRIPTOR_HANDLE color_target_descriptor;
-  float color_target_clear_values[4];
+  float color_target_clear[4];
 
   ID3D12Resource *ds_target;
   D3D12_CPU_DESCRIPTOR_HANDLE ds_target_descriptor;
   DXGI_FORMAT ds_target_format;
-  D3D12_DEPTH_STENCIL_VALUE ds_target_clear_values;
+  D3D12_DEPTH_STENCIL_VALUE ds_target_clear;
 
   uint32_t num_msaa_samples;
 
