@@ -26,9 +26,10 @@ struct CgVertex
 struct CgObject
 {
   float2 position;
-  float rotation;
+  float2 rotation; // cos, sin
   uint mesh_index;
   uint colors[OBJ_MAX_MATERIALS];
+  float _pad[7];
 };
 
 struct CgPerFrameConst
@@ -37,6 +38,6 @@ struct CgPerFrameConst
 };
 
 #if __STDC_VERSION__
-static_assert(sizeof(CgObject) == 32);
+static_assert(sizeof(CgObject) == 64);
 static_assert(sizeof(CgVertex) == 12);
 #endif

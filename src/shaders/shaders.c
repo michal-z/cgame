@@ -37,8 +37,8 @@ void s00_vs(uint vertex_id : SV_VertexID,
   CgVertex v = vb[vertex_id + first_vertex];
   CgObject obj = ob[object_id];
 
-  float sin_r = sin(obj.rotation);
-  float cos_r = cos(obj.rotation);
+  float cos_r = obj.rotation[0];
+  float sin_r = obj.rotation[1];
 
   float2 p = float2(v.position.x * cos_r - v.position.y * sin_r + obj.position.x,
     v.position.x * sin_r + v.position.y * cos_r + obj.position.y);

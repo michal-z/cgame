@@ -5,6 +5,7 @@
 #include "gui.h"
 
 #define OBJ_MAX 1000
+#define SHAPE_MAX 100
 
 #define FONT_ROBOTO_16 0
 #define FONT_ROBOTO_24 1
@@ -19,6 +20,8 @@
 #define CLEAR_COLOR { 0.2f, 0.4f, 0.8f, 1.0f }
 #define NUM_MSAA_SAMPLES 4
 #define MIN_WINDOW_SIZE 400
+
+#define CAMERA_VIEW_HEIGHT 12.0f
 
 typedef struct GameState GameState;
 typedef struct Mesh Mesh;
@@ -39,12 +42,19 @@ struct GameState
   ID3D12Resource *static_geo_buffer;
   ID3D12Resource *object_buffer;
   struct nk_font *fonts[FONT_MAX];
+
   Mesh meshes[MESH_MAX];
-  uint32_t meshes_num;
   CgObject objects[OBJ_MAX];
+  uint32_t meshes_num;
   uint32_t objects_num;
+
+  struct {
+    b2WorldId world;
+    b2BodyId bodies[OBJ_MAX];
+    b2ShapeId shapes[SHAPE_MAX];
+  } phy;
 };
-static_assert(sizeof(GameState) <= 64 * 1024);
+static_assert(sizeof(GameState) <= 128 * 1024);
 
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
@@ -470,22 +480,62 @@ game_init(GameState *game_state)
   //
   game_state->objects[game_state->objects_num++] = (CgObject){
     .position = { 0.0f, 0.0f },
-    .rotation = 0.0f,
-    .mesh_index = MESH_CIRCLE_1M_INSET_5CM,
+    .rotation = { cosf(0.0f), sinf(0.0f) },
+    //.mesh_index = MESH_CIRCLE_1M_INSET_5CM,
+    .mesh_index = MESH_SQUARE_1M_INSET_5CM,
     .colors = {
       nk_color_u32(nk_rgba_f(1.0f, 0.0f, 0.0f, 1.0f)),
       nk_color_u32(nk_rgba_f(0.0f, 0.0f, 0.0f, 1.0f)),
     },
   };
   game_state->objects[game_state->objects_num++] = (CgObject){
-    .position = { 7.0f, 3.0f },
-    .rotation = 0.5f,
+    .position = { 0.0f, 6.0f },
+    .rotation = { cosf(0.5f), sinf(0.5f) },
     .mesh_index = MESH_SQUARE_1M_INSET_5CM,
     .colors = {
       nk_color_u32(nk_rgba_f(1.0f, 1.0f, 0.0f, 1.0f)),
       nk_color_u32(nk_rgba_f(0.0f, 0.0f, 0.0f, 1.0f)),
     },
   };
+
+  {
+    b2WorldDef world_def = b2DefaultWorldDef();
+    b2WorldId world = game_state->phy.world = b2CreateWorld(&world_def);
+
+    {
+      b2BodyDef body_def = b2DefaultBodyDef();
+      body_def.type = b2_staticBody;
+      body_def.position.y = -CAMERA_VIEW_HEIGHT * 0.5f;
+      b2BodyId ground = b2CreateBody(world, &body_def);
+
+      b2Polygon box = b2MakeBox(CAMERA_VIEW_HEIGHT * 2, 0.5f);
+      b2ShapeDef shape_def = b2DefaultShapeDef();
+      b2CreatePolygonShape(ground, &shape_def, &box);
+    }
+    {
+      b2BodyDef body_def = b2DefaultBodyDef();
+      body_def.type = b2_staticBody;
+      body_def.position.x = game_state->objects[0].position[0];
+      body_def.position.y = game_state->objects[0].position[1];
+      body_def.rotation.c = game_state->objects[0].rotation[0];
+      body_def.rotation.s = game_state->objects[0].rotation[1];
+      game_state->phy.bodies[0] = b2CreateBody(world, &body_def);
+    }
+    {
+      b2BodyDef body_def = b2DefaultBodyDef();
+      body_def.type = b2_dynamicBody;
+      body_def.position.x = game_state->objects[1].position[0];
+      body_def.position.y = game_state->objects[1].position[1];
+      body_def.rotation.c = game_state->objects[1].rotation[0];
+      body_def.rotation.s = game_state->objects[1].rotation[1];
+      game_state->phy.bodies[1] = b2CreateBody(world, &body_def);
+    }
+  }
+
+  b2Polygon box = b2MakeBox(0.5f, 0.5f);
+  b2ShapeDef shape_def = b2DefaultShapeDef();
+  b2CreatePolygonShape(game_state->phy.bodies[0], &shape_def, &box);
+  b2CreatePolygonShape(game_state->phy.bodies[1], &shape_def, &box);
 }
 
 static void
@@ -494,6 +544,8 @@ game_deinit(GameState *game_state)
   GpuContext *gpu = &game_state->gpu_context;
 
   gpu_finish_command_lists(gpu);
+
+  b2DestroyWorld(game_state->phy.world);
 
   gui_deinit(&game_state->gui_context);
 
@@ -512,8 +564,15 @@ game_update(GameState *game_state)
 {
   GpuContext *gpu = &game_state->gpu_context;
 
-  float dt = window_update_frame_stats(gpu->window, game_state->name);
+  b2World_Step(game_state->phy.world, 1.0f / 60.0f, 1);
 
+  for (uint32_t i = 0; i < game_state->objects_num; ++i) {
+    b2Transform t = b2Body_GetTransform(game_state->phy.bodies[i]);
+    memcpy(&game_state->objects[i], &t, sizeof(t));
+  }
+
+  window_update_frame_stats(gpu->window, game_state->name);
+#if 0
   {
     CgObject *obj = &game_state->objects[0];
     obj->position[0] += dt;
@@ -522,6 +581,7 @@ game_update(GameState *game_state)
   }
 
   game_state->objects[1].rotation += 0.5f * dt;
+#endif
 
   GpuContextState gpu_ctx_state = gpu_update_context(gpu);
 
@@ -624,7 +684,7 @@ game_draw(GameState *game_state)
   // Bind per frame constant data at root index 1
   {
     float aspect = (float)gpu->viewport_width / gpu->viewport_height;
-    float map_size = 10.0f;
+    float map_size = CAMERA_VIEW_HEIGHT;
 
     GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
       sizeof(CgPerFrameConst));
