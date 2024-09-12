@@ -5,7 +5,6 @@
 #include "gui.h"
 
 #define OBJ_MAX 1000
-#define SHAPE_MAX 100
 
 #define FONT_ROBOTO_16 0
 #define FONT_ROBOTO_24 1
@@ -51,7 +50,6 @@ struct GameState
   struct {
     b2WorldId world;
     b2BodyId bodies[OBJ_MAX];
-    b2ShapeId shapes[SHAPE_MAX];
   } phy;
 };
 static_assert(sizeof(GameState) <= 128 * 1024);

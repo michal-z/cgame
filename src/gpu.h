@@ -1,7 +1,5 @@
 #pragma once
 
-#define GPU_MAX_BUFFERED_FRAMES 2
-
 #define GPU_ENABLE_DEBUG_LAYER 1
 #define GPU_ENABLE_GPU_BASED_VALIDATION 0
 
@@ -13,10 +11,10 @@
 #define GPU_MAX_RTV_DESCRIPTORS 64
 #define GPU_MAX_DSV_DESCRIPTORS 64
 #define GPU_MAX_SHADER_DESCRIPTORS (32 * 1024)
+#define GPU_MAX_COMMAND_LISTS 4
+#define GPU_MAX_BUFFERED_FRAMES 2
 
 #define GPU_UPLOAD_HEAP_CAPACITY (64 * 1024 * 1024)
-
-#define GPU_MAX_COMMAND_LISTS 4
 
 typedef struct GpuUploadMemoryHeap GpuUploadMemoryHeap;
 typedef struct GpuContext GpuContext;
@@ -40,6 +38,15 @@ struct GpuUploadMemoryHeap
   D3D12_GPU_VIRTUAL_ADDRESS gpu_base_addr;
   uint32_t size;
   uint32_t capacity;
+};
+
+struct GpuUploadBufferRegion
+{
+  uint8_t *cpu_addr;
+  D3D12_GPU_VIRTUAL_ADDRESS gpu_addr;
+  ID3D12Resource *buffer;
+  uint64_t buffer_offset;
+  uint64_t size;
 };
 
 struct GpuContextDesc
@@ -110,15 +117,6 @@ struct GpuContext
   uint32_t frame_index;
 
   GpuUploadMemoryHeap upload_heaps[GPU_MAX_BUFFERED_FRAMES];
-};
-
-struct GpuUploadBufferRegion
-{
-  uint8_t *cpu_addr;
-  D3D12_GPU_VIRTUAL_ADDRESS gpu_addr;
-  ID3D12Resource *buffer;
-  uint64_t buffer_offset;
-  uint64_t size;
 };
 
 void gpu_init_context(GpuContext *gpu, GpuContextDesc *desc);
