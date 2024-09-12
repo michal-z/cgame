@@ -469,7 +469,7 @@ game_init(GameState *game_state)
       game_state->meshes_num += 1;
       total_num_points += num_points;
     }
-    gpu_end_command_list(gpu, cmdlist);
+    gpu_end_command_list(gpu);
 
     gpu_execute_command_lists(gpu);
     gpu_finish_command_lists(gpu);
@@ -572,16 +572,6 @@ game_update(GameState *game_state)
   }
 
   window_update_frame_stats(gpu->window, game_state->name);
-#if 0
-  {
-    CgObject *obj = &game_state->objects[0];
-    obj->position[0] += dt;
-    obj->position[0] = fmodf(obj->position[0], 8.0f);
-    obj->rotation += 0.5f * dt;
-  }
-
-  game_state->objects[1].rotation += 0.5f * dt;
-#endif
 
   GpuContextState gpu_ctx_state = gpu_update_context(gpu);
 
@@ -709,12 +699,12 @@ game_draw(GameState *game_state)
       0);
   }
 
-  gui_draw(&game_state->gui_context, gpu, cmdlist, game_state->pso[PSO_GUI],
+  gui_draw(&game_state->gui_context, gpu, game_state->pso[PSO_GUI],
     game_state->pso_rs[PSO_GUI]);
 
-  gpu_resolve_render_target(gpu, cmdlist);
+  gpu_resolve_render_target(gpu);
 
-  gpu_end_command_list(gpu, cmdlist);
+  gpu_end_command_list(gpu);
 
   gpu_execute_command_lists(gpu);
   gpu_present_frame(gpu);

@@ -246,15 +246,18 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
 
   LOG("[gpu] Command allocators created");
 
-  VHR(ID3D12Device14_CreateCommandList1(gpu->device, 0,
-    D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_FLAG_NONE,
-    &IID_ID3D12GraphicsCommandList10, &gpu->command_list));
+  for (uint32_t i = 0; i < GPU_MAX_COMMAND_LISTS; ++i) {
+    VHR(ID3D12Device14_CreateCommandList1(gpu->device, 0,
+      D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_LIST_FLAG_NONE,
+      &IID_ID3D12GraphicsCommandList10, &gpu->command_lists[i]));
 
 #if GPU_ENABLE_DEBUG_LAYER
-  VHR(ID3D12GraphicsCommandList10_QueryInterface(gpu->command_list,
-    &IID_ID3D12DebugCommandList3, &gpu->debug_command_list));
+    VHR(ID3D12GraphicsCommandList10_QueryInterface(gpu->command_lists[i],
+      &IID_ID3D12DebugCommandList3, &gpu->debug_command_lists[i]));
 #endif
-  LOG("[gpu] Command list created");
+  }
+
+  LOG("[gpu] Command lists created");
 
   //
   // Swap chain
@@ -333,11 +336,11 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
 
   gpu->color_target_descriptor = gpu->rtv_dheap_start;
   gpu->num_msaa_samples = desc->num_msaa_samples;
-  gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
-    gpu->viewport_height, gpu->num_msaa_samples, gpu->color_target_clear);
-
   memcpy(gpu->color_target_clear, desc->color_target_clear,
     sizeof(gpu->color_target_clear));
+
+  gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
+    gpu->viewport_height, gpu->num_msaa_samples, gpu->color_target_clear);
 
   ID3D12Device14_CreateRenderTargetView(gpu->device, gpu->color_target, NULL,
     gpu->color_target_descriptor);
@@ -435,7 +438,9 @@ void
 gpu_deinit_context(GpuContext *gpu)
 {
   assert(gpu);
-  SAFE_RELEASE(gpu->command_list);
+  for (uint32_t i = 0; i < GPU_MAX_COMMAND_LISTS; ++i) {
+    SAFE_RELEASE(gpu->command_lists[i]);
+  }
   for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i) {
     SAFE_RELEASE(gpu->command_allocators[i]);
     umh_deinit(&gpu->upload_heaps[i]);
@@ -458,7 +463,9 @@ gpu_deinit_context(GpuContext *gpu)
   SAFE_RELEASE(gpu->adapter);
   SAFE_RELEASE(gpu->dxgi_factory);
 #if GPU_ENABLE_DEBUG_LAYER
-  SAFE_RELEASE(gpu->debug_command_list);
+  for (uint32_t i = 0; i < GPU_MAX_COMMAND_LISTS; ++i) {
+    SAFE_RELEASE(gpu->debug_command_lists[i]);
+  }
   SAFE_RELEASE(gpu->debug_command_queue);
   SAFE_RELEASE(gpu->debug_info_queue);
   SAFE_RELEASE(gpu->debug);
@@ -476,40 +483,19 @@ gpu_deinit_context(GpuContext *gpu)
 #endif
 }
 
-void
-gpu_execute_command_lists(GpuContext *gpu)
-{
-  assert(gpu);
-  // For now, just execute our single command list.
-  ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue, 1,
-    (ID3D12CommandList **)&gpu->command_list);
-}
-
-void
-gpu_finish_command_lists(GpuContext *gpu)
-{
-  assert(gpu && gpu->device);
-  gpu->frame_fence_counter += 1;
-
-  VHR(ID3D12CommandQueue_Signal(gpu->command_queue, gpu->frame_fence,
-    gpu->frame_fence_counter));
-
-  VHR(ID3D12Fence_SetEventOnCompletion(gpu->frame_fence, gpu->frame_fence_counter,
-    gpu->frame_fence_event));
-
-  WaitForSingleObject(gpu->frame_fence_event, INFINITE);
-  gpu->upload_heaps[gpu->frame_index].size = 0;
-}
-
 ID3D12GraphicsCommandList10 *
 gpu_begin_command_list(GpuContext *gpu)
 {
   assert(gpu);
+  assert(gpu->current_cmdlist == NULL);
+  assert(gpu->current_cmdlist_index >= 0 &&
+    gpu->current_cmdlist_index < GPU_MAX_COMMAND_LISTS);
+
+  gpu->current_cmdlist = gpu->command_lists[gpu->current_cmdlist_index];
 
   ID3D12CommandAllocator *cmdalloc = gpu->command_allocators[gpu->frame_index];
-  ID3D12GraphicsCommandList10 *cmdlist = gpu->command_list;
+  ID3D12GraphicsCommandList10 *cmdlist = gpu->current_cmdlist;
 
-  VHR(ID3D12CommandAllocator_Reset(cmdalloc));
   VHR(ID3D12GraphicsCommandList10_Reset(cmdlist, cmdalloc, NULL));
 
   ID3D12GraphicsCommandList10_SetDescriptorHeaps(cmdlist, 1, &gpu->shader_dheap);
@@ -535,20 +521,62 @@ gpu_begin_command_list(GpuContext *gpu)
 }
 
 void
-gpu_end_command_list(GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist)
+gpu_end_command_list(GpuContext *gpu)
 {
-  assert(gpu && cmdlist);
-  // For now, just close the command list.
-  VHR(ID3D12GraphicsCommandList10_Close(cmdlist));
+  assert(gpu);
+  assert(gpu->current_cmdlist != NULL);
+  assert(gpu->current_cmdlist_index >= 0 &&
+    gpu->current_cmdlist_index < GPU_MAX_COMMAND_LISTS);
+
+  VHR(ID3D12GraphicsCommandList10_Close(gpu->current_cmdlist));
+  gpu->current_cmdlist = NULL;
+  gpu->current_cmdlist_index += 1;
 }
 
 void
-gpu_resolve_render_target(GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist)
+gpu_execute_command_lists(GpuContext *gpu)
 {
-  assert(gpu && cmdlist);
+  assert(gpu);
+  assert(gpu->current_cmdlist == NULL);
+  assert(gpu->current_cmdlist_index > 0 &&
+    gpu->current_cmdlist_index <= GPU_MAX_COMMAND_LISTS);
+
+  ID3D12CommandQueue_ExecuteCommandLists(gpu->command_queue,
+    gpu->current_cmdlist_index, (ID3D12CommandList **)&gpu->command_lists[0]);
+  gpu->current_cmdlist_index = 0;
+}
+
+void
+gpu_finish_command_lists(GpuContext *gpu)
+{
+  assert(gpu && gpu->device);
+  gpu->frame_fence_counter += 1;
+
+  VHR(ID3D12CommandQueue_Signal(gpu->command_queue, gpu->frame_fence,
+    gpu->frame_fence_counter));
+
+  VHR(ID3D12Fence_SetEventOnCompletion(gpu->frame_fence, gpu->frame_fence_counter,
+    gpu->frame_fence_event));
+
+  WaitForSingleObject(gpu->frame_fence_event, INFINITE);
+  gpu->upload_heaps[gpu->frame_index].size = 0;
+}
+
+ID3D12GraphicsCommandList10 *
+gpu_current_command_list(GpuContext *gpu)
+{
+  assert(gpu);
+  assert(gpu->current_cmdlist != NULL);
+  return gpu->current_cmdlist;
+}
+
+void
+gpu_resolve_render_target(GpuContext *gpu)
+{
+  assert(gpu && gpu->current_cmdlist);
   assert(gpu->color_target && gpu->num_msaa_samples > 1);
 
-  ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+  ID3D12GraphicsCommandList10_Barrier(gpu->current_cmdlist, 1,
     &(D3D12_BARRIER_GROUP){
       .Type = D3D12_BARRIER_TYPE_TEXTURE,
       .NumBarriers = 2,
@@ -572,11 +600,11 @@ gpu_resolve_render_target(GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist)
       },
     });
 
-  ID3D12GraphicsCommandList10_ResolveSubresource(cmdlist,
+  ID3D12GraphicsCommandList10_ResolveSubresource(gpu->current_cmdlist,
     gpu->swap_chain_buffers[gpu->frame_index], 0, gpu->color_target, 0,
     GPU_COLOR_TARGET_FORMAT);
 
-  ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+  ID3D12GraphicsCommandList10_Barrier(gpu->current_cmdlist, 1,
     &(D3D12_BARRIER_GROUP){
       .Type = D3D12_BARRIER_TYPE_TEXTURE,
       .NumBarriers = 2,
@@ -632,7 +660,9 @@ gpu_present_frame(GpuContext *gpu)
   }
 
   gpu->frame_index = IDXGISwapChain4_GetCurrentBackBufferIndex(gpu->swap_chain);
+
   gpu->upload_heaps[gpu->frame_index].size = 0;
+  VHR(ID3D12CommandAllocator_Reset(gpu->command_allocators[gpu->frame_index]));
 }
 
 GpuContextState

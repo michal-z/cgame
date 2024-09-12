@@ -16,6 +16,8 @@
 
 #define GPU_UPLOAD_HEAP_CAPACITY (64 * 1024 * 1024)
 
+#define GPU_MAX_COMMAND_LISTS 4
+
 typedef struct GpuUploadMemoryHeap GpuUploadMemoryHeap;
 typedef struct GpuContext GpuContext;
 typedef struct GpuContextDesc GpuContextDesc;
@@ -61,13 +63,15 @@ struct GpuContext
 
   ID3D12CommandQueue *command_queue;
   ID3D12CommandAllocator *command_allocators[GPU_MAX_BUFFERED_FRAMES];
-  ID3D12GraphicsCommandList10 *command_list;
+  ID3D12GraphicsCommandList10 *command_lists[GPU_MAX_COMMAND_LISTS];
+  ID3D12GraphicsCommandList10 *current_cmdlist;
+  int32_t current_cmdlist_index;
 
 #if GPU_ENABLE_DEBUG_LAYER
   ID3D12Debug6 *debug;
   ID3D12DebugDevice2 *debug_device;
   ID3D12DebugCommandQueue1 *debug_command_queue;
-  ID3D12DebugCommandList3 *debug_command_list;
+  ID3D12DebugCommandList3 *debug_command_lists[GPU_MAX_COMMAND_LISTS];
   ID3D12InfoQueue1 *debug_info_queue;
 #endif
 
@@ -120,13 +124,12 @@ struct GpuUploadBufferRegion
 void gpu_init_context(GpuContext *gpu, GpuContextDesc *desc);
 void gpu_deinit_context(GpuContext *gpu);
 GpuContextState gpu_update_context(GpuContext *gpu);
+void gpu_resolve_render_target(GpuContext *gpu);
 void gpu_present_frame(GpuContext *gpu);
+GpuUploadBufferRegion gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size);
 
 ID3D12GraphicsCommandList10 *gpu_begin_command_list(GpuContext *gpu);
-void gpu_end_command_list(GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist);
-void gpu_resolve_render_target(GpuContext *gpu,
-  ID3D12GraphicsCommandList10 *cmdlist);
+void gpu_end_command_list(GpuContext *gpu);
 void gpu_execute_command_lists(GpuContext *gpu);
 void gpu_finish_command_lists(GpuContext *gpu);
-
-GpuUploadBufferRegion gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size);
+ID3D12GraphicsCommandList10 *gpu_current_command_list(GpuContext *gpu);

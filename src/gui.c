@@ -144,7 +144,7 @@ gui_init_end(GuiContext *gui, GpuContext *gpu)
       });
   }
 
-  gpu_end_command_list(gpu, cmdlist);
+  gpu_end_command_list(gpu);
 
   gpu_execute_command_lists(gpu);
   gpu_finish_command_lists(gpu);
@@ -169,8 +169,8 @@ gui_deinit(GuiContext *gui)
 }
 
 void
-gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist,
-  ID3D12PipelineState *pso, ID3D12RootSignature *pso_rs)
+gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
+  ID3D12RootSignature *pso_rs)
 {
   GpuUploadBufferRegion upload_vb = gpu_alloc_upload_memory(gpu,
     MAX_VERTEX_BUFFER);
@@ -178,6 +178,8 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist,
     MAX_INDEX_BUFFER);
   GpuUploadBufferRegion upload_cb = gpu_alloc_upload_memory(gpu,
     sizeof(float) * 4 * 4);
+
+  ID3D12GraphicsCommandList10 *cmdlist = gpu_current_command_list(gpu);
 
   ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmdlist, pso_rs);
   ID3D12GraphicsCommandList10_SetPipelineState(cmdlist, pso);
@@ -230,7 +232,7 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12GraphicsCommandList10 *cmdlist,
   ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->index_buffer, 0,
     upload_ib.buffer, upload_ib.buffer_offset, MAX_INDEX_BUFFER);
 
-  ID3D12GraphicsCommandList10_Barrier(gpu->command_list, 1,
+  ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
     &(D3D12_BARRIER_GROUP){
       .Type = D3D12_BARRIER_TYPE_BUFFER,
       .NumBarriers = 2,
