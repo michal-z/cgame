@@ -18,9 +18,9 @@
 
 typedef struct GpuUploadMemoryHeap GpuUploadMemoryHeap;
 typedef struct GpuContext GpuContext;
-typedef struct GpuContextDesc GpuContextDesc;
+typedef struct GpuInitContextArgs GpuInitContextArgs;
 typedef struct GpuUploadBufferRegion GpuUploadBufferRegion;
-typedef struct GpuCreateTextureDesc GpuCreateTextureDesc;
+typedef struct GpuCreateTextureFromFileArgs GpuCreateTextureFromFileArgs;
 
 typedef enum GpuContextState GpuContextState;
 
@@ -50,13 +50,13 @@ struct GpuUploadBufferRegion
   uint64_t size;
 };
 
-struct GpuCreateTextureDesc
+struct GpuLoadTextureDesc
 {
   uint32_t num_mips;
   D3D12_RESOURCE_FLAGS tex_flags;
 };
 
-struct GpuContextDesc
+struct GpuInitContextArgs
 {
   HWND window;
   uint32_t num_msaa_samples;
@@ -129,7 +129,7 @@ struct GpuContext
   IWICImagingFactory *wic_factory;
 };
 
-void gpu_init_context(GpuContext *gpu, GpuContextDesc *desc);
+void gpu_init_context(GpuContext *gpu, const GpuInitContextArgs *args);
 void gpu_deinit_context(GpuContext *gpu);
 GpuContextState gpu_update_context(GpuContext *gpu);
 void gpu_resolve_render_target(GpuContext *gpu);
@@ -145,4 +145,4 @@ void gpu_finish_command_lists(GpuContext *gpu);
 void gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,
   uint32_t subresource, uint8_t *data, uint32_t data_row_pitch);
 ID3D12Resource *gpu_create_texture_from_file(GpuContext *gpu,
-  const char *filename, GpuCreateTextureDesc *desc);
+  const char *filename, const GpuCreateTextureFromFileArgs *args);

@@ -107,16 +107,16 @@ create_depth_stencil_target(ID3D12Device14 *device, uint32_t width,
 }
 
 void
-gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
+gpu_init_context(GpuContext *gpu, const GpuInitContextArgs *args)
 {
-  assert(gpu && gpu->device == NULL && desc);
-  assert(desc->num_msaa_samples == 2 || desc->num_msaa_samples == 4 ||
-    desc->num_msaa_samples == 8);
+  assert(gpu && gpu->device == NULL && args);
+  assert(args->num_msaa_samples == 2 || args->num_msaa_samples == 4 ||
+    args->num_msaa_samples == 8);
 
   RECT rect = {0};
-  GetClientRect(desc->window, &rect);
+  GetClientRect(args->window, &rect);
 
-  gpu->window = desc->window;
+  gpu->window = args->window;
   gpu->viewport_width = rect.right;
   gpu->viewport_height = rect.bottom;
 
@@ -335,8 +335,8 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
     gpu->rtv_dheap_descriptor_size);
 
   gpu->color_target_descriptor = gpu->rtv_dheap_start;
-  gpu->num_msaa_samples = desc->num_msaa_samples;
-  memcpy(gpu->color_target_clear, desc->color_target_clear,
+  gpu->num_msaa_samples = args->num_msaa_samples;
+  memcpy(gpu->color_target_clear, args->color_target_clear,
     sizeof(gpu->color_target_clear));
 
   gpu->color_target = create_msaa_target(gpu->device, gpu->viewport_width,
@@ -371,8 +371,8 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
 
   gpu->ds_target = NULL;
   gpu->ds_target_descriptor = gpu->dsv_dheap_start;
-  gpu->ds_target_format = desc->ds_target_format;
-  gpu->ds_target_clear = desc->ds_target_clear;
+  gpu->ds_target_format = args->ds_target_format;
+  gpu->ds_target_clear = args->ds_target_clear;
 
   if (gpu->ds_target_format != DXGI_FORMAT_UNKNOWN) {
     gpu->ds_target = create_depth_stencil_target(gpu->device,
@@ -810,9 +810,9 @@ gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,
 
 ID3D12Resource *
 gpu_create_texture_from_file(GpuContext *gpu, const char *filename,
-  GpuCreateTextureDesc *desc)
+  const GpuCreateTextureFromFileArgs *args)
 {
-  assert(gpu && gpu->current_cmdlist && filename && desc);
+  assert(gpu && gpu->current_cmdlist && filename && args);
 
   wchar_t filename_w[MAX_PATH];
   mbstowcs_s(NULL, filename_w, MAX_PATH, filename, MAX_PATH - 1);
@@ -820,6 +820,29 @@ gpu_create_texture_from_file(GpuContext *gpu, const char *filename,
   IWICBitmapDecoder *bmp_decoder = NULL;
   VHR(IWICImagingFactory_CreateDecoderFromFilename(gpu->wic_factory, filename_w,
     NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &bmp_decoder));
+
+  IWICBitmapFrameDecode *bmp_frame = NULL;
+  VHR(IWICBitmapDecoder_GetFrame(bmp_decoder, 0, &bmp_frame));
+
+  GUID wic_fmt = {0};
+  VHR(IWICBitmapFrameDecode_GetPixelFormat(bmp_frame, &wic_fmt));
+
+  uint32_t num_components = 0;
+  {
+    IWICComponentInfo *comp_info;
+    VHR(IWICImagingFactory_CreateComponentInfo(gpu->wic_factory, &wic_fmt,
+      &comp_info));
+
+    IWICPixelFormatInfo *fmt_info;
+    VHR(IWICComponentInfo_QueryInterface(comp_info, &IID_IWICPixelFormatInfo,
+      &fmt_info));
+
+    VHR(IWICPixelFormatInfo_GetChannelCount(fmt_info, &num_components));
+
+    SAFE_RELEASE(comp_info);
+    SAFE_RELEASE(fmt_info);
+  }
+  assert(num_components >= 1 && num_components <= 4);
 
   // TODO:
   return NULL;

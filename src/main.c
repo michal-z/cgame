@@ -253,7 +253,7 @@ game_init(GameState *game_state)
   }
 
   gpu_init_context(&game_state->gpu_context,
-    &(GpuContextDesc){
+    &(GpuInitContextArgs){
       .window = window,
       .color_target_clear = CLEAR_COLOR,
       .ds_target_format = DEPTH_STENCIL_TARGET_FORMAT,
