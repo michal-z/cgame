@@ -130,4 +130,7 @@ ID3D12GraphicsCommandList10 *gpu_begin_command_list(GpuContext *gpu);
 void gpu_end_command_list(GpuContext *gpu);
 void gpu_execute_command_lists(GpuContext *gpu);
 void gpu_finish_command_lists(GpuContext *gpu);
-ID3D12GraphicsCommandList10 *gpu_current_command_list(GpuContext *gpu);
+
+/// `tex` layout must be: D3D12_BARRIER_LAYOUT_COPY_DEST
+void gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,
+  uint32_t subresource, uint8_t *data, uint32_t data_row_pitch);

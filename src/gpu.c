@@ -562,14 +562,6 @@ gpu_finish_command_lists(GpuContext *gpu)
   gpu->upload_heaps[gpu->frame_index].size = 0;
 }
 
-ID3D12GraphicsCommandList10 *
-gpu_current_command_list(GpuContext *gpu)
-{
-  assert(gpu);
-  assert(gpu->current_cmdlist != NULL);
-  return gpu->current_cmdlist;
-}
-
 void
 gpu_resolve_render_target(GpuContext *gpu)
 {
@@ -759,4 +751,43 @@ gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size)
     .buffer_offset = offset,
     .size = size,
   };
+}
+
+void
+gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,
+  uint32_t subresource, uint8_t *data, uint32_t data_row_pitch)
+{
+  assert(gpu && gpu->current_cmdlist && tex && data);
+
+  D3D12_RESOURCE_DESC desc = {0};
+  ID3D12Resource_GetDesc(tex, &desc);
+
+  D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout = {0};
+  uint64_t required_size = {0};
+  ID3D12Device14_GetCopyableFootprints(gpu->device, &desc, subresource, 1, 0,
+    &layout, NULL, NULL, &required_size);
+
+  GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
+    (uint32_t)required_size);
+  layout.Offset = upload.buffer_offset;
+
+  for (uint32_t y = 0; y < layout.Footprint.Height; ++y) {
+    memcpy(upload.cpu_addr + y * layout.Footprint.RowPitch,
+      data + y * data_row_pitch,
+      NK_MIN(data_row_pitch, layout.Footprint.RowPitch));
+  }
+
+  ID3D12GraphicsCommandList10_CopyTextureRegion(gpu->current_cmdlist,
+    &(D3D12_TEXTURE_COPY_LOCATION){
+      .pResource = tex,
+      .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+      .SubresourceIndex = subresource,
+    },
+    0, 0, 0,
+    &(D3D12_TEXTURE_COPY_LOCATION){
+      .pResource = upload.buffer,
+      .Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+      .PlacedFootprint = layout,
+    },
+    NULL);
 }

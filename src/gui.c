@@ -97,36 +97,8 @@ gui_init_end(GuiContext *gui, GpuContext *gpu)
           * gpu->shader_dheap_descriptor_size
       });
 
-    D3D12_RESOURCE_DESC desc = {0};
-    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout = {0};
-    uint64_t required_size = {0};
-
-    ID3D12Resource_GetDesc(gui->font_texture, &desc);
-    ID3D12Device14_GetCopyableFootprints(gpu->device, &desc, 0, 1, 0, &layout,
-      NULL, NULL, &required_size);
-
-    GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
-      (uint32_t)required_size);
-    layout.Offset = upload.buffer_offset;
-
-    for (uint32_t y = 0; y < layout.Footprint.Height; ++y) {
-      memcpy(upload.cpu_addr + y * layout.Footprint.RowPitch,
-        (uint8_t *)font_image + y * (font_w * 4), font_w * 4);
-    }
-
-    ID3D12GraphicsCommandList10_CopyTextureRegion(cmdlist,
-      &(D3D12_TEXTURE_COPY_LOCATION){
-        .pResource = gui->font_texture,
-        .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
-        .SubresourceIndex = 0,
-      },
-      0, 0, 0,
-      &(D3D12_TEXTURE_COPY_LOCATION){
-        .pResource = upload.buffer,
-        .Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
-        .PlacedFootprint = layout,
-      },
-      NULL);
+    gpu_upload_tex2d_subresource(gpu, gui->font_texture, 0,
+      (uint8_t *)font_image, font_w * 4);
 
     ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
       &(D3D12_BARRIER_GROUP){
@@ -179,7 +151,8 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
   GpuUploadBufferRegion upload_cb = gpu_alloc_upload_memory(gpu,
     sizeof(float) * 4 * 4);
 
-  ID3D12GraphicsCommandList10 *cmdlist = gpu_current_command_list(gpu);
+  assert(gpu->current_cmdlist);
+  ID3D12GraphicsCommandList10 *cmdlist = gpu->current_cmdlist;
 
   ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmdlist, pso_rs);
   ID3D12GraphicsCommandList10_SetPipelineState(cmdlist, pso);
