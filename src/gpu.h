@@ -20,6 +20,7 @@ typedef struct GpuUploadMemoryHeap GpuUploadMemoryHeap;
 typedef struct GpuContext GpuContext;
 typedef struct GpuContextDesc GpuContextDesc;
 typedef struct GpuUploadBufferRegion GpuUploadBufferRegion;
+typedef struct GpuCreateTextureDesc GpuCreateTextureDesc;
 
 typedef enum GpuContextState GpuContextState;
 
@@ -47,6 +48,12 @@ struct GpuUploadBufferRegion
   ID3D12Resource *buffer;
   uint64_t buffer_offset;
   uint64_t size;
+};
+
+struct GpuCreateTextureDesc
+{
+  uint32_t num_mips;
+  D3D12_RESOURCE_FLAGS tex_flags;
 };
 
 struct GpuContextDesc
@@ -137,3 +144,5 @@ void gpu_finish_command_lists(GpuContext *gpu);
 /// `tex` layout must be: D3D12_BARRIER_LAYOUT_COPY_DEST
 void gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,
   uint32_t subresource, uint8_t *data, uint32_t data_row_pitch);
+ID3D12Resource *gpu_create_texture_from_file(GpuContext *gpu,
+  const char *filename, GpuCreateTextureDesc *desc);

@@ -807,3 +807,12 @@ gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,
     },
     NULL);
 }
+
+ID3D12Resource *
+gpu_create_texture_from_file(GpuContext *gpu, const char *filename,
+  GpuCreateTextureDesc *desc)
+{
+  assert(gpu && gpu->current_cmdlist && filename && desc);
+  // TODO:
+  return NULL;
+}
