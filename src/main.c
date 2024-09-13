@@ -711,6 +711,7 @@ game_draw(GameState *game_state)
 int
 main(void)
 {
+  CoInitializeEx(NULL, COINIT_MULTITHREADED);
   SetProcessDPIAware();
 
   GameState game_state = { .name = "cgame" };
@@ -739,5 +740,6 @@ main(void)
 
   game_deinit(&game_state);
 
+  CoUninitialize();
   return 0;
 }

@@ -6,6 +6,7 @@
 #define COBJMACROS
 #include "d3d12.h"
 #include <dxgi1_6.h>
+#include <wincodec.h>
 
 #include <stdio.h>
 #include <stdlib.h>

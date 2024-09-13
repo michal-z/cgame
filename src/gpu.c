@@ -432,12 +432,21 @@ gpu_init_context(GpuContext *gpu, GpuContextDesc *desc)
     umh_init(&gpu->upload_heaps[i], gpu->device, GPU_UPLOAD_HEAP_CAPACITY);
   }
   LOG("[gpu] Upload heaps created");
+
+  //
+  // WIC
+  //
+  VHR(CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
+    &IID_IWICImagingFactory, &gpu->wic_factory));
+
+  LOG("[gpu] WIC factory created");
 }
 
 void
 gpu_deinit_context(GpuContext *gpu)
 {
   assert(gpu);
+  SAFE_RELEASE(gpu->wic_factory);
   for (uint32_t i = 0; i < GPU_MAX_COMMAND_LISTS; ++i) {
     SAFE_RELEASE(gpu->command_lists[i]);
   }

@@ -118,6 +118,8 @@ struct GpuContext
   uint32_t frame_index;
 
   GpuUploadMemoryHeap upload_heaps[GPU_MAX_BUFFERED_FRAMES];
+
+  IWICImagingFactory *wic_factory;
 };
 
 void gpu_init_context(GpuContext *gpu, GpuContextDesc *desc);
