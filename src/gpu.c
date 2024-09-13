@@ -492,6 +492,10 @@ gpu_begin_command_list(GpuContext *gpu)
     gpu->current_cmdlist_index < GPU_MAX_COMMAND_LISTS);
 
   gpu->current_cmdlist = gpu->command_lists[gpu->current_cmdlist_index];
+#if GPU_ENABLE_DEBUG_LAYER
+  gpu->debug_current_cmdlist =
+    gpu->debug_command_lists[gpu->current_cmdlist_index];
+#endif
 
   ID3D12CommandAllocator *cmdalloc = gpu->command_allocators[gpu->frame_index];
   ID3D12GraphicsCommandList10 *cmdlist = gpu->current_cmdlist;
@@ -530,6 +534,9 @@ gpu_end_command_list(GpuContext *gpu)
 
   VHR(ID3D12GraphicsCommandList10_Close(gpu->current_cmdlist));
   gpu->current_cmdlist = NULL;
+#if GPU_ENABLE_DEBUG_LAYER
+  gpu->debug_current_cmdlist = NULL;
+#endif
   gpu->current_cmdlist_index += 1;
 }
 

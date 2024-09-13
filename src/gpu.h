@@ -79,6 +79,7 @@ struct GpuContext
   ID3D12DebugDevice2 *debug_device;
   ID3D12DebugCommandQueue1 *debug_command_queue;
   ID3D12DebugCommandList3 *debug_command_lists[GPU_MAX_COMMAND_LISTS];
+  ID3D12DebugCommandList3 *debug_current_cmdlist;
   ID3D12InfoQueue1 *debug_info_queue;
 #endif
 
