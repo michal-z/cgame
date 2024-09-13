@@ -813,6 +813,14 @@ gpu_create_texture_from_file(GpuContext *gpu, const char *filename,
   GpuCreateTextureDesc *desc)
 {
   assert(gpu && gpu->current_cmdlist && filename && desc);
+
+  wchar_t filename_w[MAX_PATH];
+  mbstowcs_s(NULL, filename_w, MAX_PATH, filename, MAX_PATH - 1);
+
+  IWICBitmapDecoder *bmp_decoder = NULL;
+  VHR(IWICImagingFactory_CreateDecoderFromFilename(gpu->wic_factory, filename_w,
+    NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &bmp_decoder));
+
   // TODO:
   return NULL;
 }
