@@ -50,7 +50,7 @@ struct GpuUploadBufferRegion
   uint64_t size;
 };
 
-struct GpuLoadTextureDesc
+struct GpuCreateTextureFromFileArgs
 {
   uint32_t num_mips;
   D3D12_RESOURCE_FLAGS tex_flags;

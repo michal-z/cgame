@@ -817,15 +817,15 @@ gpu_create_texture_from_file(GpuContext *gpu, const char *filename,
   wchar_t filename_w[MAX_PATH];
   mbstowcs_s(NULL, filename_w, MAX_PATH, filename, MAX_PATH - 1);
 
-  IWICBitmapDecoder *bmp_decoder = NULL;
+  IWICBitmapDecoder *decoder = NULL;
   VHR(IWICImagingFactory_CreateDecoderFromFilename(gpu->wic_factory, filename_w,
-    NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &bmp_decoder));
+    NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder));
 
-  IWICBitmapFrameDecode *bmp_frame = NULL;
-  VHR(IWICBitmapDecoder_GetFrame(bmp_decoder, 0, &bmp_frame));
+  IWICBitmapFrameDecode *decoder_frame = NULL;
+  VHR(IWICBitmapDecoder_GetFrame(decoder, 0, &decoder_frame));
 
   GUID wic_fmt = {0};
-  VHR(IWICBitmapFrameDecode_GetPixelFormat(bmp_frame, &wic_fmt));
+  VHR(IWICBitmapFrameDecode_GetPixelFormat(decoder_frame, &wic_fmt));
 
   uint32_t num_components = 0;
   {
@@ -844,6 +844,72 @@ gpu_create_texture_from_file(GpuContext *gpu, const char *filename,
   }
   assert(num_components >= 1 && num_components <= 4);
 
-  // TODO:
-  return NULL;
+  IWICFormatConverter *fmt_converter = NULL;
+  VHR(IWICImagingFactory_CreateFormatConverter(gpu->wic_factory, &fmt_converter));
+
+  GUID wic_dest_fmt = (num_components == 1) ? GUID_WICPixelFormat8bppGray :
+    GUID_WICPixelFormat32bppRGBA;
+
+  VHR(IWICFormatConverter_Initialize(fmt_converter,
+    (IWICBitmapSource *)decoder_frame, &wic_dest_fmt, WICBitmapDitherTypeNone,
+    NULL, 0.0, WICBitmapPaletteTypeCustom));
+
+  uint32_t img_w, img_h;
+  VHR(IWICFormatConverter_GetSize(fmt_converter, &img_w, &img_h));
+
+  DXGI_FORMAT tex_fmt = (num_components == 1) ? DXGI_FORMAT_R8_UNORM :
+    DXGI_FORMAT_R8G8B8A8_UNORM;
+
+  ID3D12Resource *tex;
+  VHR(ID3D12Device14_CreateCommittedResource3(gpu->device,
+    &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
+    D3D12_HEAP_FLAG_NONE,
+    &(D3D12_RESOURCE_DESC1){
+      .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+      .Width = img_w,
+      .Height = img_h,
+      .Format = tex_fmt,
+      .DepthOrArraySize = 1,
+      .MipLevels = (uint16_t)args->num_mips,
+      .SampleDesc = { .Count = 1 },
+      .Flags = args->tex_flags,
+    },
+    D3D12_BARRIER_LAYOUT_COPY_DEST,
+    NULL, NULL, 0, NULL, &IID_ID3D12Resource, &tex));
+
+  D3D12_RESOURCE_DESC desc = {0};
+  ID3D12Resource_GetDesc(tex, &desc);
+
+  D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout = {0};
+  uint64_t required_size = {0};
+  ID3D12Device14_GetCopyableFootprints(gpu->device, &desc, 0, 1, 0, &layout,
+    NULL, NULL, &required_size);
+
+  GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
+    (uint32_t)required_size);
+  layout.Offset = upload.buffer_offset;
+
+  VHR(IWICFormatConverter_CopyPixels(fmt_converter, NULL,
+    layout.Footprint.RowPitch,
+    layout.Footprint.RowPitch * layout.Footprint.Height, upload.cpu_addr));
+
+  ID3D12GraphicsCommandList10_CopyTextureRegion(gpu->current_cmdlist,
+    &(D3D12_TEXTURE_COPY_LOCATION){
+      .pResource = tex,
+      .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+      .SubresourceIndex = 0,
+    },
+    0, 0, 0,
+    &(D3D12_TEXTURE_COPY_LOCATION){
+      .pResource = upload.buffer,
+      .Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+      .PlacedFootprint = layout,
+    },
+    NULL);
+
+  SAFE_RELEASE(fmt_converter);
+  SAFE_RELEASE(decoder);
+  SAFE_RELEASE(decoder_frame);
+
+  return tex;
 }
