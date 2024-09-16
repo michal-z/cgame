@@ -12,7 +12,9 @@ float4 unpack_color(uint color)
 
 #define ROOT_SIGNATURE "RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), " \
   "RootConstants(b0, num32BitConstants = 2), " \
-  "CBV(b1, visibility = SHADER_VISIBILITY_VERTEX)"
+  "CBV(b1, visibility = SHADER_VISIBILITY_VERTEX), " \
+  "StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR," \
+  " visibility = SHADER_VISIBILITY_PIXEL)"
 
 struct PerDrawConst
 {
@@ -20,22 +22,19 @@ struct PerDrawConst
   uint object_id;
 };
 ConstantBuffer<PerDrawConst> g_draw_const : register(b0);
-
 ConstantBuffer<CgPerFrameConst> g_frame_const: register(b1);
+SamplerState g_sampler0 : register(s0);
 
 [RootSignature(ROOT_SIGNATURE)]
 void s00_vs(uint vertex_id : SV_VertexID,
-  out float4 out_position : SV_Position,
-  out float4 out_color : _Color)
+  out float2 out_uv : _Uv,
+  out float4 out_position : SV_Position)
 {
   StructuredBuffer<CgVertex> vb = ResourceDescriptorHeap[RDH_STATIC_GEO_BUFFER];
   StructuredBuffer<CgObject> ob = ResourceDescriptorHeap[RDH_OBJECT_BUFFER];
 
-  uint first_vertex = g_draw_const.first_vertex;
-  uint object_id = g_draw_const.object_id;
-
-  CgVertex v = vb[vertex_id + first_vertex];
-  CgObject obj = ob[object_id];
+  CgVertex v = vb[vertex_id + g_draw_const.first_vertex];
+  CgObject obj = ob[g_draw_const.object_id];
 
   float cos_r = obj.rotation[0];
   float sin_r = obj.rotation[1];
@@ -44,15 +43,19 @@ void s00_vs(uint vertex_id : SV_VertexID,
     v.position.x * sin_r + v.position.y * cos_r + obj.position.y);
 
   out_position = mul(float4(p, 0.0, 1.0), g_frame_const.mvp);
-  out_color = unpack_color(obj.colors[v.material_index]);
+  out_uv = v.uv;
 }
 
 [RootSignature(ROOT_SIGNATURE)]
-void s00_ps(float4 position : SV_Position,
-  float4 color : _Color,
+void s00_ps(float2 uv : _Uv,
+  float4 position : SV_Position,
   out float4 out_color : SV_Target0)
 {
-  out_color = color;
+  StructuredBuffer<CgObject> ob = ResourceDescriptorHeap[RDH_OBJECT_BUFFER];
+  CgObject obj = ob[g_draw_const.object_id];
+
+  Texture2D tex = ResourceDescriptorHeap[obj.texture_index];
+  out_color = tex.Sample(g_sampler0, uv);
 }
 
 #elif _s01
@@ -61,8 +64,8 @@ void s00_ps(float4 position : SV_Position,
   "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
   "CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), " \
   "CBV(b0, visibility = SHADER_VISIBILITY_VERTEX), " \
-  "StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR, " \
-  "visibility = SHADER_VISIBILITY_PIXEL)"
+  "StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR," \
+  " visibility = SHADER_VISIBILITY_PIXEL)"
 
 struct PerFrameConst
 {

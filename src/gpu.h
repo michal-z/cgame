@@ -138,8 +138,8 @@ GpuUploadBufferRegion gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size);
 
 ID3D12GraphicsCommandList10 *gpu_begin_command_list(GpuContext *gpu);
 void gpu_end_command_list(GpuContext *gpu);
-void gpu_execute_command_lists(GpuContext *gpu);
-void gpu_finish_command_lists(GpuContext *gpu);
+void gpu_flush_command_lists(GpuContext *gpu);
+void gpu_wait_for_completion(GpuContext *gpu);
 
 /// `tex` layout must be: D3D12_BARRIER_LAYOUT_COPY_DEST
 void gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,

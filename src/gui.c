@@ -118,8 +118,8 @@ gui_init_end(GuiContext *gui, GpuContext *gpu)
 
   gpu_end_command_list(gpu);
 
-  gpu_execute_command_lists(gpu);
-  gpu_finish_command_lists(gpu);
+  gpu_flush_command_lists(gpu);
+  gpu_wait_for_completion(gpu);
 
   nk_font_atlas_end(&gui->atlas, nk_handle_id(0), &gui->tex_null);
 }

@@ -5,13 +5,13 @@
 #include "gui.h"
 
 #define OBJ_MAX 1000
+#define OBJ_MAX_TEXTURES 64
 
 #define FONT_ROBOTO_16 0
 #define FONT_ROBOTO_24 1
 #define FONT_MAX 4
 
-#define MESH_SQUARE_1M_INSET_5CM 0
-#define MESH_CIRCLE_1M_INSET_5CM 1
+#define MESH_SQUARE_1M 0
 #define MESH_MAX 32
 
 #define STATIC_GEO_BUFFER_MAX_VERTS (100 * 1000)
@@ -40,6 +40,8 @@ struct GameState
   ID3D12PipelineState *pso[PSO_MAX];
   ID3D12Resource *static_geo_buffer;
   ID3D12Resource *object_buffer;
+  ID3D12Resource *object_textures[OBJ_MAX_TEXTURES];
+  uint32_t object_textures_num;
   struct nk_font *fonts[FONT_MAX];
 
   Mesh meshes[MESH_MAX];
@@ -435,26 +437,22 @@ game_init(GameState *game_state)
   // Meshes
   //
   {
+    const char *filenames[MESH_MAX] = {NULL};
+    filenames[MESH_SQUARE_1M] = "assets/meshes/square_1m.mesh";
+
     ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
-
-    const char *mesh_filenames[MESH_MAX] = {NULL};
-    mesh_filenames[MESH_SQUARE_1M_INSET_5CM] =
-      "assets/meshes/square_1m_inset_5cm.mesh";
-    mesh_filenames[MESH_CIRCLE_1M_INSET_5CM] =
-      "assets/meshes/circle_1m_inset_5cm.mesh";
-
     uint64_t total_num_points = 0;
 
     for (uint32_t i = 0; i < MESH_MAX; ++i) {
-      if (mesh_filenames[i] == NULL) continue;
+      if (filenames[i] == NULL) continue;
 
       uint32_t num_points;
-      load_mesh(mesh_filenames[i], &num_points, NULL);
+      load_mesh(filenames[i], &num_points, NULL);
 
       GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
         num_points * sizeof(CgVertex));
 
-      load_mesh(mesh_filenames[i], NULL, (CgVertex *)upload.cpu_addr);
+      load_mesh(filenames[i], NULL, (CgVertex *)upload.cpu_addr);
 
       ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist,
         game_state->static_geo_buffer, total_num_points * sizeof(CgVertex),
@@ -468,10 +466,56 @@ game_init(GameState *game_state)
       total_num_points += num_points;
     }
     gpu_end_command_list(gpu);
-
-    gpu_execute_command_lists(gpu);
-    gpu_finish_command_lists(gpu);
   }
+
+  //
+  // Textures
+  //
+  {
+    const char *filenames[OBJ_MAX_TEXTURES] = {NULL};
+    filenames[0] = "assets/textures/test.png";
+
+    ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
+
+    for (uint32_t i = 0; i < OBJ_MAX_TEXTURES; ++i) {
+      if (filenames[i] == NULL) continue;
+
+      game_state->object_textures[i] = gpu_create_texture_from_file(gpu,
+        filenames[i],
+        &(GpuCreateTextureFromFileArgs){
+          .num_mips = 1,
+        });
+
+      ID3D12Device14_CreateShaderResourceView(gpu->device,
+        game_state->object_textures[i], NULL,
+        (D3D12_CPU_DESCRIPTOR_HANDLE){
+          .ptr = gpu->shader_dheap_start_cpu.ptr + (RDH_OBJECT_TEX0 + i)
+            * gpu->shader_dheap_descriptor_size
+        });
+
+      ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+        &(D3D12_BARRIER_GROUP){
+          .Type = D3D12_BARRIER_TYPE_TEXTURE,
+          .NumBarriers = 1,
+          .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+            .SyncBefore = D3D12_BARRIER_SYNC_COPY,
+            .SyncAfter = D3D12_BARRIER_SYNC_DRAW,
+            .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
+            .AccessAfter = D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+            .LayoutBefore = D3D12_BARRIER_LAYOUT_COPY_DEST,
+            .LayoutAfter = D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+            .pResource = game_state->object_textures[i],
+          },
+        });
+
+      game_state->object_textures_num += 1;
+    }
+
+    gpu_end_command_list(gpu);
+  }
+
+  gpu_flush_command_lists(gpu);
+  gpu_wait_for_completion(gpu);
 
   //
   // Objects
@@ -479,21 +523,14 @@ game_init(GameState *game_state)
   game_state->objects[game_state->objects_num++] = (CgObject){
     .position = { 0.0f, 0.0f },
     .rotation = { cosf(0.0f), sinf(0.0f) },
-    //.mesh_index = MESH_CIRCLE_1M_INSET_5CM,
-    .mesh_index = MESH_SQUARE_1M_INSET_5CM,
-    .colors = {
-      nk_color_u32(nk_rgba_f(1.0f, 0.0f, 0.0f, 1.0f)),
-      nk_color_u32(nk_rgba_f(0.0f, 0.0f, 0.0f, 1.0f)),
-    },
+    .mesh_index = MESH_SQUARE_1M,
+    .texture_index = RDH_OBJECT_TEX0,
   };
   game_state->objects[game_state->objects_num++] = (CgObject){
     .position = { 0.0f, 6.0f },
     .rotation = { cosf(0.5f), sinf(0.5f) },
-    .mesh_index = MESH_SQUARE_1M_INSET_5CM,
-    .colors = {
-      nk_color_u32(nk_rgba_f(1.0f, 1.0f, 0.0f, 1.0f)),
-      nk_color_u32(nk_rgba_f(0.0f, 0.0f, 0.0f, 1.0f)),
-    },
+    .mesh_index = MESH_SQUARE_1M,
+    .texture_index = RDH_OBJECT_TEX0,
   };
 
   {
@@ -541,7 +578,7 @@ game_deinit(GameState *game_state)
 {
   GpuContext *gpu = &game_state->gpu_context;
 
-  gpu_finish_command_lists(gpu);
+  gpu_wait_for_completion(gpu);
 
   b2DestroyWorld(game_state->phy.world);
 
@@ -549,6 +586,9 @@ game_deinit(GameState *game_state)
 
   SAFE_RELEASE(game_state->static_geo_buffer);
   SAFE_RELEASE(game_state->object_buffer);
+  for (uint32_t i = 0; i < OBJ_MAX_TEXTURES; ++i) {
+    SAFE_RELEASE(game_state->object_textures[i]);
+  }
   for (uint32_t i = 0; i < PSO_MAX; ++i) {
     SAFE_RELEASE(game_state->pso[i]);
     SAFE_RELEASE(game_state->pso_rs[i]);
@@ -704,7 +744,7 @@ game_draw(GameState *game_state)
 
   gpu_end_command_list(gpu);
 
-  gpu_execute_command_lists(gpu);
+  gpu_flush_command_lists(gpu);
   gpu_present_frame(gpu);
 }
 

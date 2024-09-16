@@ -3,8 +3,7 @@
 #define RDH_STATIC_GEO_BUFFER 0
 #define RDH_OBJECT_BUFFER 1
 #define RDH_GUI_FONT_TEXTURE 2
-
-#define OBJ_MAX_MATERIALS 4
+#define RDH_OBJECT_TEX0 3
 
 #if __STDC_VERSION__
 typedef struct CgVertex CgVertex;
@@ -20,7 +19,7 @@ typedef unsigned int uint;
 struct CgVertex
 {
   float2 position;
-  uint material_index;
+  float2 uv;
 };
 
 struct CgObject
@@ -28,8 +27,8 @@ struct CgObject
   float2 position;
   float2 rotation; // cos, sin
   uint mesh_index;
-  uint colors[OBJ_MAX_MATERIALS];
-  float _pad[7];
+  uint texture_index;
+  float _pad[10];
 };
 
 struct CgPerFrameConst
@@ -39,5 +38,5 @@ struct CgPerFrameConst
 
 #if __STDC_VERSION__
 static_assert(sizeof(CgObject) == 64);
-static_assert(sizeof(CgVertex) == 12);
+static_assert(sizeof(CgVertex) == 16);
 #endif

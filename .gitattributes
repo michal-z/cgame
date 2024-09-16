@@ -7,3 +7,4 @@
 *.exe binary
 *.ttf binary
 *.mesh binary
+*.png binary

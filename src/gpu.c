@@ -550,7 +550,7 @@ gpu_end_command_list(GpuContext *gpu)
 }
 
 void
-gpu_execute_command_lists(GpuContext *gpu)
+gpu_flush_command_lists(GpuContext *gpu)
 {
   assert(gpu);
   assert(gpu->current_cmdlist == NULL);
@@ -563,7 +563,7 @@ gpu_execute_command_lists(GpuContext *gpu)
 }
 
 void
-gpu_finish_command_lists(GpuContext *gpu)
+gpu_wait_for_completion(GpuContext *gpu)
 {
   assert(gpu && gpu->device);
   gpu->frame_fence_counter += 1;
@@ -696,7 +696,7 @@ gpu_update_context(GpuContext *gpu)
     LOG("[gpu] Window resized to %ldx%ld", current_rect.right,
       current_rect.bottom);
 
-    gpu_finish_command_lists(gpu);
+    gpu_wait_for_completion(gpu);
 
     for (uint32_t i = 0; i < GPU_MAX_BUFFERED_FRAMES; ++i)
       SAFE_RELEASE(gpu->swap_chain_buffers[i]);
