@@ -1,6 +1,6 @@
 #pragma once
 
-#define RDH_STATIC_GEO_BUFFER 0
+#define RDH_VERTEX_BUFFER_STATIC 0
 #define RDH_OBJECT_BUFFER 1
 #define RDH_GUI_FONT_TEXTURE 2
 #define RDH_OBJECT_TEX0 3

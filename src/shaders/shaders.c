@@ -1,13 +1,5 @@
 #include "../cpu_gpu_common.h"
 
-float4 unpack_color(uint color)
-{
-  return float4((color & 0xff) / 255.0,
-    ((color & 0xff00) >> 8) / 255.0,
-    ((color & 0xff0000) >> 16) / 255.0,
-    ((color & 0xff000000) >> 24) / 255.0);
-}
-
 #if _s00
 
 #define ROOT_SIGNATURE "RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), " \
@@ -30,7 +22,8 @@ void s00_vs(uint vertex_id : SV_VertexID,
   out float2 out_uv : _Uv,
   out float4 out_position : SV_Position)
 {
-  StructuredBuffer<CgVertex> vb = ResourceDescriptorHeap[RDH_STATIC_GEO_BUFFER];
+  StructuredBuffer<CgVertex> vb =
+    ResourceDescriptorHeap[RDH_VERTEX_BUFFER_STATIC];
   StructuredBuffer<CgObject> ob = ResourceDescriptorHeap[RDH_OBJECT_BUFFER];
 
   CgVertex v = vb[vertex_id + g_draw_const.first_vertex];

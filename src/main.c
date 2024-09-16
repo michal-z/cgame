@@ -14,7 +14,7 @@
 #define MESH_SQUARE_1M 0
 #define MESH_MAX 32
 
-#define STATIC_GEO_BUFFER_MAX_VERTS (100 * 1000)
+#define VERTEX_BUFFER_STATIC_MAX_VERTS (100 * 1000)
 #define DEPTH_STENCIL_TARGET_FORMAT DXGI_FORMAT_D32_FLOAT
 #define CLEAR_COLOR { 0.2f, 0.4f, 0.8f, 1.0f }
 #define NUM_MSAA_SAMPLES 4
@@ -38,7 +38,7 @@ struct GameState
   GuiContext gui_context;
   ID3D12RootSignature *pso_rs[PSO_MAX];
   ID3D12PipelineState *pso[PSO_MAX];
-  ID3D12Resource *static_geo_buffer;
+  ID3D12Resource *vertex_buffer_static;
   ID3D12Resource *object_buffer;
   ID3D12Resource *object_textures[OBJ_MAX_TEXTURES];
   uint32_t object_textures_num;
@@ -407,7 +407,7 @@ game_init(GameState *game_state)
     D3D12_HEAP_FLAG_NONE,
     &(D3D12_RESOURCE_DESC1){
       .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
-      .Width = STATIC_GEO_BUFFER_MAX_VERTS * sizeof(CgVertex),
+      .Width = VERTEX_BUFFER_STATIC_MAX_VERTS * sizeof(CgVertex),
       .Height = 1,
       .DepthOrArraySize = 1,
       .MipLevels = 1,
@@ -415,21 +415,21 @@ game_init(GameState *game_state)
       .Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
     },
     D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, NULL, 0, NULL,
-    &IID_ID3D12Resource, &game_state->static_geo_buffer));
+    &IID_ID3D12Resource, &game_state->vertex_buffer_static));
 
   ID3D12Device14_CreateShaderResourceView(gpu->device,
-    game_state->static_geo_buffer,
+    game_state->vertex_buffer_static,
     &(D3D12_SHADER_RESOURCE_VIEW_DESC){
       .ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
       .Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
       .Buffer = {
         .FirstElement = 0,
-        .NumElements = STATIC_GEO_BUFFER_MAX_VERTS,
+        .NumElements = VERTEX_BUFFER_STATIC_MAX_VERTS,
         .StructureByteStride = sizeof(CgVertex),
       },
     },
     (D3D12_CPU_DESCRIPTOR_HANDLE){
-      .ptr = gpu->shader_dheap_start_cpu.ptr + RDH_STATIC_GEO_BUFFER
+      .ptr = gpu->shader_dheap_start_cpu.ptr + RDH_VERTEX_BUFFER_STATIC
         * gpu->shader_dheap_descriptor_size
     });
 
@@ -455,7 +455,7 @@ game_init(GameState *game_state)
       load_mesh(filenames[i], NULL, (CgVertex *)upload.cpu_addr);
 
       ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist,
-        game_state->static_geo_buffer, total_num_points * sizeof(CgVertex),
+        game_state->vertex_buffer_static, total_num_points * sizeof(CgVertex),
         upload.buffer, upload.buffer_offset, upload.size);
 
       game_state->meshes[i] = (Mesh){
@@ -584,7 +584,7 @@ game_deinit(GameState *game_state)
 
   gui_deinit(&game_state->gui_context);
 
-  SAFE_RELEASE(game_state->static_geo_buffer);
+  SAFE_RELEASE(game_state->vertex_buffer_static);
   SAFE_RELEASE(game_state->object_buffer);
   for (uint32_t i = 0; i < OBJ_MAX_TEXTURES; ++i) {
     SAFE_RELEASE(game_state->object_textures[i]);
