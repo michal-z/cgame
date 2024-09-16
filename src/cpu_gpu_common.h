@@ -13,7 +13,6 @@ typedef struct CgPerFrameConst CgPerFrameConst;
 typedef float float2[2];
 typedef float float3[3];
 typedef float float4x4[4][4];
-typedef unsigned int uint;
 #endif
 
 struct CgVertex
@@ -26,9 +25,10 @@ struct CgObject
 {
   float2 position;
   float2 rotation; // cos, sin
-  uint mesh_index;
-  uint texture_index;
-  float _pad[10];
+  uint32_t mesh_index;
+  uint32_t texture_index;
+  uint64_t b2_body_id; // b2BodyId
+  float _pad[8];
 };
 
 struct CgPerFrameConst

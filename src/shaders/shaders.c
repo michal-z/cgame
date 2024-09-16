@@ -10,15 +10,15 @@
 
 struct PerDrawConst
 {
-  uint first_vertex;
-  uint object_id;
+  uint32_t first_vertex;
+  uint32_t object_id;
 };
 ConstantBuffer<PerDrawConst> g_draw_const : register(b0);
 ConstantBuffer<CgPerFrameConst> g_frame_const: register(b1);
 SamplerState g_sampler0 : register(s0);
 
 [RootSignature(ROOT_SIGNATURE)]
-void s00_vs(uint vertex_id : SV_VertexID,
+void s00_vs(uint32_t vertex_id : SV_VertexID,
   out float2 out_uv : _Uv,
   out float4 out_position : SV_Position)
 {

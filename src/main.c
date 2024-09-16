@@ -55,6 +55,7 @@ struct GameState
   } phy;
 };
 static_assert(sizeof(GameState) <= 128 * 1024);
+static_assert(sizeof(uint64_t) == sizeof(b2BodyId));
 
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
