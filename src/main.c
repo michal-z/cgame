@@ -13,6 +13,7 @@
 
 #define MESH_SQUARE_1M 0
 #define MESH_MAX 32
+#define MESH_INVALID MESH_MAX
 
 #define VERTEX_BUFFER_STATIC_MAX_VERTS (100 * 1000)
 #define DEPTH_STENCIL_TARGET_FORMAT DXGI_FORMAT_D32_FLOAT
@@ -49,10 +50,7 @@ struct GameState
   uint32_t meshes_num;
   uint32_t objects_num;
 
-  struct {
-    b2WorldId world;
-    b2BodyId bodies[OBJ_MAX];
-  } phy;
+  b2WorldId phy_world;
 };
 static_assert(sizeof(GameState) <= 128 * 1024);
 static_assert(sizeof(uint64_t) == sizeof(b2BodyId));
@@ -522,57 +520,58 @@ game_init(GameState *game_state)
   //
   // Objects
   //
-  game_state->objects[game_state->objects_num++] = (CgObject){
-    .position = { 0.0f, 0.0f },
-    .rotation = { cosf(0.0f), sinf(0.0f) },
-    .mesh_index = MESH_SQUARE_1M,
-    .texture_index = RDH_OBJECT_TEX0,
-  };
-  game_state->objects[game_state->objects_num++] = (CgObject){
-    .position = { 0.0f, 6.0f },
-    .rotation = { cosf(0.5f), sinf(0.5f) },
-    .mesh_index = MESH_SQUARE_1M,
-    .texture_index = RDH_OBJECT_TEX0,
-  };
-
   {
     b2WorldDef world_def = b2DefaultWorldDef();
-    b2WorldId world = game_state->phy.world = b2CreateWorld(&world_def);
-
-    {
-      b2BodyDef body_def = b2DefaultBodyDef();
-      body_def.type = b2_staticBody;
-      body_def.position.y = -CAMERA_VIEW_HEIGHT * 0.5f;
-      b2BodyId ground = b2CreateBody(world, &body_def);
-
-      b2Polygon box = b2MakeBox(CAMERA_VIEW_HEIGHT * 2, 0.5f);
-      b2ShapeDef shape_def = b2DefaultShapeDef();
-      b2CreatePolygonShape(ground, &shape_def, &box);
-    }
-    {
-      b2BodyDef body_def = b2DefaultBodyDef();
-      body_def.type = b2_staticBody;
-      body_def.position.x = game_state->objects[0].position[0];
-      body_def.position.y = game_state->objects[0].position[1];
-      body_def.rotation.c = game_state->objects[0].rotation[0];
-      body_def.rotation.s = game_state->objects[0].rotation[1];
-      game_state->phy.bodies[0] = b2CreateBody(world, &body_def);
-    }
-    {
-      b2BodyDef body_def = b2DefaultBodyDef();
-      body_def.type = b2_dynamicBody;
-      body_def.position.x = game_state->objects[1].position[0];
-      body_def.position.y = game_state->objects[1].position[1];
-      body_def.rotation.c = game_state->objects[1].rotation[0];
-      body_def.rotation.s = game_state->objects[1].rotation[1];
-      game_state->phy.bodies[1] = b2CreateBody(world, &body_def);
-    }
+    game_state->phy_world = b2CreateWorld(&world_def);
   }
+  b2WorldId phy_world = game_state->phy_world;
 
-  b2Polygon box = b2MakeBox(0.5f, 0.5f);
-  b2ShapeDef shape_def = b2DefaultShapeDef();
-  b2CreatePolygonShape(game_state->phy.bodies[0], &shape_def, &box);
-  b2CreatePolygonShape(game_state->phy.bodies[1], &shape_def, &box);
+  b2Polygon box1m = b2MakeBox(0.5f, 0.5f);
+  b2ShapeDef box1m_def = b2DefaultShapeDef();
+
+  {
+    b2BodyDef body_def = b2DefaultBodyDef();
+    body_def.type = b2_staticBody;
+    body_def.position = (b2Vec2){ 0.0f, 0.0f };
+    body_def.rotation = (b2Rot){ cosf(0.0f), sinf(0.0f) };
+    b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+    b2CreatePolygonShape(body_id, &box1m_def, &box1m);
+
+    game_state->objects[game_state->objects_num++] = (CgObject){
+      .mesh_index = MESH_SQUARE_1M,
+      .texture_index = RDH_OBJECT_TEX0,
+      .phy_body_id = *(uint64_t *)&body_id,
+    };
+  }
+  {
+    b2BodyDef body_def = b2DefaultBodyDef();
+    body_def.type = b2_dynamicBody;
+    body_def.position = (b2Vec2){ 0.0f, 6.0f };
+    body_def.rotation = (b2Rot){ cosf(0.5f), sinf(0.5f) };
+    b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+    b2CreatePolygonShape(body_id, &box1m_def, &box1m);
+
+    game_state->objects[game_state->objects_num++] = (CgObject){
+      .mesh_index = MESH_SQUARE_1M,
+      .texture_index = RDH_OBJECT_TEX0,
+      .phy_body_id = *(uint64_t *)&body_id,
+    };
+  }
+  {
+    b2BodyDef body_def = b2DefaultBodyDef();
+    body_def.type = b2_staticBody;
+    body_def.position = (b2Vec2){ 0.0f, -CAMERA_VIEW_HEIGHT * 0.5f };
+    b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+
+    b2Polygon ground = b2MakeBox(CAMERA_VIEW_HEIGHT * 2, 0.5f);
+    b2ShapeDef ground_def = b2DefaultShapeDef();
+    b2CreatePolygonShape(body_id, &ground_def, &ground);
+
+    game_state->objects[game_state->objects_num++] = (CgObject){
+      .mesh_index = MESH_INVALID,
+      .phy_body_id = *(uint64_t *)&body_id,
+    };
+  }
 }
 
 static void
@@ -582,7 +581,7 @@ game_deinit(GameState *game_state)
 
   gpu_wait_for_completion(gpu);
 
-  b2DestroyWorld(game_state->phy.world);
+  b2DestroyWorld(game_state->phy_world);
 
   gui_deinit(&game_state->gui_context);
 
@@ -604,10 +603,11 @@ game_update(GameState *game_state)
 {
   GpuContext *gpu = &game_state->gpu_context;
 
-  b2World_Step(game_state->phy.world, 1.0f / 60.0f, 1);
+  b2World_Step(game_state->phy_world, 1.0f / 60.0f, 1);
 
   for (uint32_t i = 0; i < game_state->objects_num; ++i) {
-    b2Transform t = b2Body_GetTransform(game_state->phy.bodies[i]);
+    b2BodyId body_id = *(b2BodyId *)&game_state->objects[i].phy_body_id;
+    b2Transform t = b2Body_GetTransform(body_id);
     memcpy(&game_state->objects[i], &t, sizeof(t));
   }
 
@@ -731,6 +731,7 @@ game_draw(GameState *game_state)
 
   for (uint32_t i = 0; i < game_state->objects_num; ++i) {
     CgObject *obj = &game_state->objects[i];
+    if (obj->mesh_index == MESH_INVALID) continue;
     Mesh *mesh = &game_state->meshes[obj->mesh_index];
 
     ID3D12GraphicsCommandList10_SetGraphicsRoot32BitConstants(cmdlist, 0, 2,

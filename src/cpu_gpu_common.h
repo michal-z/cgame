@@ -27,7 +27,7 @@ struct CgObject
   float2 rotation; // cos, sin
   uint32_t mesh_index;
   uint32_t texture_index;
-  uint64_t b2_body_id; // b2BodyId
+  uint64_t phy_body_id; // b2BodyId
   float _pad[8];
 };
 
