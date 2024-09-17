@@ -55,7 +55,7 @@ void s00_ps(float2 uv : _Uv,
 
 #define ROOT_SIGNATURE \
   "RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |" \
-  "CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), " \
+  " CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), " \
   "CBV(b0, visibility = SHADER_VISIBILITY_VERTEX), " \
   "StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR," \
   " visibility = SHADER_VISIBILITY_PIXEL)"

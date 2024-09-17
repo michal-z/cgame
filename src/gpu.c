@@ -565,16 +565,15 @@ gpu_flush_command_lists(GpuContext *gpu)
 void
 gpu_wait_for_completion(GpuContext *gpu)
 {
-  assert(gpu && gpu->device);
-  gpu->frame_fence_counter += 1;
+  assert(gpu && gpu->device && gpu->current_cmdlist == NULL);
 
+  gpu->frame_fence_counter += 1;
   VHR(ID3D12CommandQueue_Signal(gpu->command_queue, gpu->frame_fence,
     gpu->frame_fence_counter));
-
   VHR(ID3D12Fence_SetEventOnCompletion(gpu->frame_fence, gpu->frame_fence_counter,
     gpu->frame_fence_event));
-
   WaitForSingleObject(gpu->frame_fence_event, INFINITE);
+
   gpu->upload_heaps[gpu->frame_index].size = 0;
 }
 
@@ -640,7 +639,8 @@ gpu_resolve_render_target(GpuContext *gpu)
 void
 gpu_present_frame(GpuContext *gpu)
 {
-  assert(gpu && gpu->device);
+  assert(gpu && gpu->device && gpu->current_cmdlist == NULL);
+
   gpu->frame_fence_counter += 1;
 
   UINT present_flags = 0;
@@ -663,7 +663,6 @@ gpu_present_frame(GpuContext *gpu)
   {
     VHR(ID3D12Fence_SetEventOnCompletion(gpu->frame_fence, gpu_frame_counter + 1,
       gpu->frame_fence_event));
-
     WaitForSingleObject(gpu->frame_fence_event, INFINITE);
   }
 
