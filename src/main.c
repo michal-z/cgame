@@ -7,9 +7,11 @@
 #define OBJ_MAX 1000
 #define OBJ_MAX_TEXTURES 64
 
-#define FONT_ROBOTO_16 0
-#define FONT_ROBOTO_24 1
+#define FONT_ROBOTO_NORMAL 0
+#define FONT_ROBOTO_LARGE 1
 #define FONT_MAX 4
+#define FONT_ROBOTO_NORMAL_SIZE 20.0f
+#define FONT_ROBOTO_LARGE_SIZE 30.0f
 
 #define MESH_SQUARE_1M 0
 #define MESH_MAX 32
@@ -266,13 +268,15 @@ game_init(GameState *game_state)
   GuiContext *gui = &game_state->gui_context;
 
   gui_init_begin(gui, gpu);
-  game_state->fonts[FONT_ROBOTO_16] = gui_init_add_font(gui,
-    "assets/fonts/Roboto-Regular.ttf", 16.0f * gui->dpi_scale_factor);
-  game_state->fonts[FONT_ROBOTO_24] = gui_init_add_font(gui,
-    "assets/fonts/Roboto-Regular.ttf", 24.0f * gui->dpi_scale_factor);
+  game_state->fonts[FONT_ROBOTO_NORMAL] = gui_init_add_font(gui,
+    "assets/fonts/Roboto-Regular.ttf", FONT_ROBOTO_NORMAL_SIZE *
+    gui->dpi_scale_factor);
+  game_state->fonts[FONT_ROBOTO_LARGE] = gui_init_add_font(gui,
+    "assets/fonts/Roboto-Regular.ttf", FONT_ROBOTO_LARGE_SIZE *
+    gui->dpi_scale_factor);
   gui_init_end(gui, gpu);
 
-  nk_style_set_font(&gui->nkctx, &game_state->fonts[FONT_ROBOTO_16]->handle);
+  nk_style_set_font(&gui->nkctx, &game_state->fonts[FONT_ROBOTO_NORMAL]->handle);
 
   //
   // PSO_FIRST
@@ -641,12 +645,11 @@ game_update(GameState *game_state)
     scale * 300.0f, scale * 300.0f), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
     NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE | NK_WINDOW_TITLE))
   {
-    nk_style_set_font(nkctx, &game_state->fonts[FONT_ROBOTO_16]->handle);
-
     {
       b2Counters s = b2World_GetCounters(game_state->phy_world);
 
-      nk_layout_row_dynamic(nkctx, 14.0f * scale, 1);
+      nk_layout_row_dynamic(nkctx, 0.75f * FONT_ROBOTO_NORMAL_SIZE * scale, 1);
+
       nk_labelf(nkctx, NK_TEXT_LEFT,
         "bodies/shapes/contacts/joints = %d/%d/%d/%d", s.bodyCount,
         s.shapeCount, s.contactCount, s.jointCount);
