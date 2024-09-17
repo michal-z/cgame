@@ -637,21 +637,23 @@ game_update(GameState *game_state)
   float scale = gui->dpi_scale_factor;
   struct nk_context *nkctx = &gui->nkctx;
 
-  if (nk_begin(nkctx, "Demo", nk_rect(10.0f * scale, 10.0f * scale,
-    scale * 200.0f, scale * 300.0f), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
+  if (nk_begin(nkctx, "Stats", nk_rect(10.0f * scale, 10.0f * scale,
+    scale * 300.0f, scale * 300.0f), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
     NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE | NK_WINDOW_TITLE))
   {
     nk_style_set_font(nkctx, &game_state->fonts[FONT_ROBOTO_16]->handle);
 
-    nk_layout_row_dynamic(nkctx, 0.0f, 1);
-    if (nk_button_label(nkctx, "Click me!"))
-      LOG("[test] button pressed");
+    {
+      b2Counters s = b2World_GetCounters(game_state->phy_world);
 
-    nk_style_set_font(nkctx, &game_state->fonts[FONT_ROBOTO_24]->handle);
+      nk_layout_row_dynamic(nkctx, 14.0f * scale, 1);
+      nk_labelf(nkctx, NK_TEXT_LEFT,
+        "bodies/shapes/contacts/joints = %d/%d/%d/%d", s.bodyCount,
+        s.shapeCount, s.contactCount, s.jointCount);
 
-    nk_layout_row_dynamic(nkctx, 0.0f, 1);
-    if (nk_button_label(nkctx, "Click me!"))
-      LOG("[test] button pressed");
+      nk_labelf(nkctx, NK_TEXT_LEFT, "islands/tasks = %d/%d", s.islandCount,
+        s.taskCount);
+    }
   }
   nk_end(nkctx);
 
