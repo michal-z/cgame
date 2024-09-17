@@ -530,44 +530,53 @@ game_init(GameState *game_state)
   b2ShapeDef box1m_def = b2DefaultShapeDef();
 
   {
+    CgObject *object = &game_state->objects[game_state->objects_num++];
+
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_staticBody;
     body_def.position = (b2Vec2){ 0.0f, 0.0f };
     body_def.rotation = (b2Rot){ cosf(0.0f), sinf(0.0f) };
+    body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy_world, &body_def);
     b2CreatePolygonShape(body_id, &box1m_def, &box1m);
 
-    game_state->objects[game_state->objects_num++] = (CgObject){
+    *object = (CgObject){
       .mesh_index = MESH_SQUARE_1M,
       .texture_index = RDH_OBJECT_TEX0,
       .phy_body_id = *(uint64_t *)&body_id,
     };
   }
   {
+    CgObject *object = &game_state->objects[game_state->objects_num++];
+
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_dynamicBody;
     body_def.position = (b2Vec2){ 0.0f, 6.0f };
     body_def.rotation = (b2Rot){ cosf(0.5f), sinf(0.5f) };
+    body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy_world, &body_def);
     b2CreatePolygonShape(body_id, &box1m_def, &box1m);
 
-    game_state->objects[game_state->objects_num++] = (CgObject){
+    *object = (CgObject){
       .mesh_index = MESH_SQUARE_1M,
       .texture_index = RDH_OBJECT_TEX0,
       .phy_body_id = *(uint64_t *)&body_id,
     };
   }
   {
+    CgObject *object = &game_state->objects[game_state->objects_num++];
+
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_staticBody;
     body_def.position = (b2Vec2){ 0.0f, -CAMERA_VIEW_HEIGHT * 0.5f };
+    body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy_world, &body_def);
 
     b2Polygon ground = b2MakeBox(CAMERA_VIEW_HEIGHT * 2, 0.5f);
     b2ShapeDef ground_def = b2DefaultShapeDef();
     b2CreatePolygonShape(body_id, &ground_def, &ground);
 
-    game_state->objects[game_state->objects_num++] = (CgObject){
+    *object = (CgObject){
       .mesh_index = MESH_INVALID,
       .phy_body_id = *(uint64_t *)&body_id,
     };
