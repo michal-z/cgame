@@ -7,11 +7,11 @@
 #define OBJ_MAX 1000
 #define OBJ_MAX_TEXTURES 64
 
-#define FONT_ROBOTO_NORMAL 0
-#define FONT_ROBOTO_LARGE 1
+#define FONT_NORMAL 0
+#define FONT_LARGE 1
 #define FONT_MAX 4
-#define FONT_ROBOTO_NORMAL_SIZE 20.0f
-#define FONT_ROBOTO_LARGE_SIZE 30.0f
+#define FONT_NORMAL_SIZE 18.0f
+#define FONT_LARGE_SIZE 30.0f
 
 #define MESH_SQUARE_1M 0
 #define MESH_MAX 32
@@ -52,7 +52,11 @@ struct GameState
   uint32_t meshes_num;
   uint32_t objects_num;
 
-  b2WorldId phy_world;
+  struct {
+    b2WorldId world;
+    b2Profile max_profile;
+    b2Profile total_profile;
+  } phy;
 };
 static_assert(sizeof(GameState) <= 128 * 1024);
 static_assert(sizeof(uint64_t) == sizeof(b2BodyId));
@@ -268,15 +272,13 @@ game_init(GameState *game_state)
   GuiContext *gui = &game_state->gui_context;
 
   gui_init_begin(gui, gpu);
-  game_state->fonts[FONT_ROBOTO_NORMAL] = gui_init_add_font(gui,
-    "assets/fonts/Roboto-Regular.ttf", FONT_ROBOTO_NORMAL_SIZE *
-    gui->dpi_scale_factor);
-  game_state->fonts[FONT_ROBOTO_LARGE] = gui_init_add_font(gui,
-    "assets/fonts/Roboto-Regular.ttf", FONT_ROBOTO_LARGE_SIZE *
-    gui->dpi_scale_factor);
+  game_state->fonts[FONT_NORMAL] = gui_init_add_font(gui,
+    "assets/fonts/DroidSans.ttf", FONT_NORMAL_SIZE * gui->dpi_scale_factor);
+  //game_state->fonts[FONT_LARGE] = gui_init_add_font(gui,
+    //"assets/fonts/Roboto-Regular.ttf", FONT_LARGE_SIZE * gui->dpi_scale_factor);
   gui_init_end(gui, gpu);
 
-  nk_style_set_font(&gui->nkctx, &game_state->fonts[FONT_ROBOTO_NORMAL]->handle);
+  nk_style_set_font(&gui->nkctx, &game_state->fonts[FONT_NORMAL]->handle);
 
   //
   // PSO_FIRST
@@ -526,9 +528,9 @@ game_init(GameState *game_state)
   //
   {
     b2WorldDef world_def = b2DefaultWorldDef();
-    game_state->phy_world = b2CreateWorld(&world_def);
+    game_state->phy.world = b2CreateWorld(&world_def);
   }
-  b2WorldId phy_world = game_state->phy_world;
+  b2WorldId phy_world = game_state->phy.world;
 
   b2Polygon box1m = b2MakeBox(0.5f, 0.5f);
   b2ShapeDef box1m_def = b2DefaultShapeDef();
@@ -594,7 +596,7 @@ game_deinit(GameState *game_state)
 
   gpu_wait_for_completion(gpu);
 
-  b2DestroyWorld(game_state->phy_world);
+  b2DestroyWorld(game_state->phy.world);
 
   gui_deinit(&game_state->gui_context);
 
@@ -616,7 +618,7 @@ game_update(GameState *game_state)
 {
   GpuContext *gpu = &game_state->gpu_context;
 
-  b2World_Step(game_state->phy_world, 1.0f / 60.0f, 1);
+  b2World_Step(game_state->phy.world, 1.0f / 60.0f, 1);
 
   for (uint32_t i = 0; i < game_state->objects_num; ++i) {
     b2BodyId body_id = *(b2BodyId *)&game_state->objects[i].phy_body_id;
@@ -641,21 +643,28 @@ game_update(GameState *game_state)
   float scale = gui->dpi_scale_factor;
   struct nk_context *nkctx = &gui->nkctx;
 
-  if (nk_begin(nkctx, "Stats", nk_rect(10.0f * scale, 10.0f * scale,
+  if (nk_begin(nkctx, "Statistics", nk_rect(10.0f * scale, 10.0f * scale,
     scale * 300.0f, scale * 300.0f), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
     NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE | NK_WINDOW_TITLE))
   {
-    {
-      b2Counters s = b2World_GetCounters(game_state->phy_world);
+    if (nk_tree_push(nkctx, NK_TREE_TAB, "Physics counters", NK_MINIMIZED)) {
+      b2Counters s = b2World_GetCounters(game_state->phy.world);
 
-      nk_layout_row_dynamic(nkctx, 0.75f * FONT_ROBOTO_NORMAL_SIZE * scale, 1);
+      nk_layout_row_dynamic(nkctx, FONT_NORMAL_SIZE * scale, 1);
 
       nk_labelf(nkctx, NK_TEXT_LEFT,
         "bodies/shapes/contacts/joints = %d/%d/%d/%d", s.bodyCount,
         s.shapeCount, s.contactCount, s.jointCount);
-
       nk_labelf(nkctx, NK_TEXT_LEFT, "islands/tasks = %d/%d", s.islandCount,
         s.taskCount);
+      nk_labelf(nkctx, NK_TEXT_LEFT, "tree height static/movable = %d/%d",
+        s.staticTreeHeight, s.treeHeight);
+      nk_labelf(nkctx, NK_TEXT_LEFT, "stack allocator size = %d K",
+        s.stackUsed / 1024);
+      nk_labelf(nkctx, NK_TEXT_LEFT, "total allocation = %d K",
+        s.byteCount / 1024);
+
+      nk_tree_pop(nkctx);
     }
   }
   nk_end(nkctx);
@@ -725,7 +734,7 @@ game_draw(GameState *game_state)
   ID3D12GraphicsCommandList10_SetPipelineState(cmdlist,
     game_state->pso[PSO_FIRST]);
 
-  // Bind per frame constant data at root index 1
+  // Bind per frame constant data at root index 1.
   {
     float aspect = (float)gpu->viewport_width / gpu->viewport_height;
     float map_size = CAMERA_VIEW_HEIGHT;
@@ -748,6 +757,7 @@ game_draw(GameState *game_state)
     if (obj->mesh_index == MESH_INVALID) continue;
     Mesh *mesh = &game_state->meshes[obj->mesh_index];
 
+    // Bind `first_vertex` and `object_id` at root index 0 and draw.
     ID3D12GraphicsCommandList10_SetGraphicsRoot32BitConstants(cmdlist, 0, 2,
       (uint32_t[]){ mesh->first_vertex, i }, 0);
     ID3D12GraphicsCommandList10_DrawInstanced(cmdlist, mesh->num_vertices, 1, 0,
