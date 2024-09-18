@@ -56,7 +56,7 @@ struct GameState
     b2WorldId world;
     b2Profile max_profile;
     b2Profile total_profile;
-    int32_t total_num_steps;
+    int32_t num_steps;
   } phy;
 };
 static_assert(sizeof(GameState) <= 128 * 1024);
@@ -620,7 +620,7 @@ game_update(GameState *game_state)
   GpuContext *gpu = &game_state->gpu_context;
 
   b2World_Step(game_state->phy.world, 1.0f / 60.0f, 1);
-  game_state->phy.total_num_steps += 1;
+  game_state->phy.num_steps += 1;
 
   for (uint32_t i = 0; i < game_state->objects_num; ++i) {
     b2BodyId body_id = *(b2BodyId *)&game_state->objects[i].phy_body_id;
@@ -702,8 +702,8 @@ game_update(GameState *game_state)
     tp->continuous += p->continuous;
 
     b2Profile *ap = &phy_avg_profile;
-    if (game_state->phy.total_num_steps > 0) {
-      float scale = 1.0f / game_state->phy.total_num_steps;
+    if (game_state->phy.num_steps > 0) {
+      float scale = 1.0f / game_state->phy.num_steps;
 
       ap->step = scale * tp->step;
       ap->pairs = scale * tp->pairs;
@@ -778,7 +778,7 @@ game_update(GameState *game_state)
       if (nk_button_label(nkctx, "Reset profile")) {
         game_state->phy.total_profile = (b2Profile){0};
         game_state->phy.max_profile = (b2Profile){0};
-        game_state->phy.total_num_steps = 0;
+        game_state->phy.num_steps = 0;
       }
 
       nk_tree_pop(nkctx);
