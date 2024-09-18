@@ -141,7 +141,7 @@ void gpu_end_command_list(GpuContext *gpu);
 void gpu_flush_command_lists(GpuContext *gpu);
 void gpu_wait_for_completion(GpuContext *gpu);
 
-/// `tex` layout must be: D3D12_BARRIER_LAYOUT_COPY_DEST
+/// `tex` layout must have: D3D12_BARRIER_LAYOUT_COPY_DEST
 void gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,
   uint32_t subresource, uint8_t *data, uint32_t data_row_pitch);
 ID3D12Resource *gpu_create_texture_from_file(GpuContext *gpu,

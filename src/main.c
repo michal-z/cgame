@@ -869,7 +869,7 @@ game_draw(GameState *game_state)
 
     // Bind `first_vertex` and `object_id` at root index 0 and draw.
     ID3D12GraphicsCommandList10_SetGraphicsRoot32BitConstants(cmdlist, 0, 2,
-      (uint32_t[]){ mesh->first_vertex, i }, 0);
+      (uint32_t[]){ mesh->first_vertex, /* object id */ i }, 0);
     ID3D12GraphicsCommandList10_DrawInstanced(cmdlist, mesh->num_vertices, 1, 0,
       0);
   }
