@@ -10,8 +10,8 @@
 #define FONT_NORMAL 0
 #define FONT_LARGE 1
 #define FONT_MAX 4
-#define FONT_NORMAL_SIZE 18.0f
-#define FONT_LARGE_SIZE 30.0f
+#define FONT_NORMAL_HEIGHT 18.0f
+#define FONT_LARGE_HEIGHT 30.0f
 
 #define MESH_SQUARE_1M 0
 #define MESH_MAX 32
@@ -274,9 +274,9 @@ game_init(GameState *game_state)
 
   gui_init_begin(gui, gpu);
   game_state->fonts[FONT_NORMAL] = gui_init_add_font(gui,
-    "assets/fonts/DroidSans.ttf", FONT_NORMAL_SIZE * gui->dpi_scale_factor);
+    "assets/fonts/DroidSans.ttf", FONT_NORMAL_HEIGHT * gui->dpi_scale_factor);
   //game_state->fonts[FONT_LARGE] = gui_init_add_font(gui,
-    //"assets/fonts/Roboto-Regular.ttf", FONT_LARGE_SIZE * gui->dpi_scale_factor);
+    //"assets/fonts/Roboto-Regular.ttf", FONT_LARGE_HEIGHT * gui->dpi_scale_factor);
   gui_init_end(gui, gpu);
 
   nk_style_set_font(&gui->nkctx, &game_state->fonts[FONT_NORMAL]->handle);
@@ -738,7 +738,7 @@ game_update(GameState *game_state)
     if (nk_tree_push(nkctx, NK_TREE_TAB, "Physics counters", NK_MINIMIZED)) {
       b2Counters s = b2World_GetCounters(game_state->phy.world);
 
-      nk_layout_row_dynamic(nkctx, FONT_NORMAL_SIZE * dpi_scale, 1);
+      nk_layout_row_dynamic(nkctx, FONT_NORMAL_HEIGHT * dpi_scale, 1);
 
       nk_labelf(nkctx, NK_TEXT_LEFT,
         "bodies/shapes/contacts/joints = %d/%d/%d/%d", s.bodyCount,
@@ -756,7 +756,7 @@ game_update(GameState *game_state)
     }
 
     if (nk_tree_push(nkctx, NK_TREE_TAB, "Physics profile", NK_MINIMIZED)) {
-      nk_layout_row_dynamic(nkctx, FONT_NORMAL_SIZE * dpi_scale, 1);
+      nk_layout_row_dynamic(nkctx, FONT_NORMAL_HEIGHT * dpi_scale, 1);
 
       const b2Profile *p = &phy_profile;
       const b2Profile *ap = &phy_avg_profile;
