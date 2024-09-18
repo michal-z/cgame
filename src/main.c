@@ -774,6 +774,13 @@ game_update(GameState *game_state)
         "builds island [avg] (max) = %.2f [%.2f] (%.2f)", p->buildIslands,
         ap->buildIslands, mp->buildIslands);
 
+      nk_layout_row_dynamic(nkctx, 0.0f, 1);
+      if (nk_button_label(nkctx, "Reset profile")) {
+        game_state->phy.total_profile = (b2Profile){0};
+        game_state->phy.max_profile = (b2Profile){0};
+        game_state->phy.total_num_steps = 0;
+      }
+
       nk_tree_pop(nkctx);
     }
   }
