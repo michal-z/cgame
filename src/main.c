@@ -882,7 +882,10 @@ game_draw(GameState *game_state)
   }
 
   gui_draw(&game_state->gui_context, gpu, game_state->pso[PSO_GUI],
-    game_state->pso_rs[PSO_GUI]);
+    game_state->pso_rs[PSO_GUI],
+    &(GuiDrawArgs){
+      .global_alpha = 0.996f,
+    });
 
   gpu_resolve_render_target(gpu);
 

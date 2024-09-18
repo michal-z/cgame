@@ -3,12 +3,18 @@
 typedef struct GpuContext GpuContext;
 typedef struct GuiVertex GuiVertex;
 typedef struct GuiContext GuiContext;
+typedef struct GuiDrawArgs GuiDrawArgs;
 
 struct GuiVertex
 {
   float pos[2];
   float uv[2];
   uint8_t col[4];
+};
+
+struct GuiDrawArgs
+{
+  float global_alpha;
 };
 
 struct GuiContext
@@ -38,7 +44,7 @@ struct nk_font *gui_init_add_font(GuiContext *gui, const char *font_file,
 void gui_deinit(GuiContext *gui);
 
 void gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
-  ID3D12RootSignature *pso_rs);
+  ID3D12RootSignature *pso_rs, const GuiDrawArgs *args);
 
 bool gui_handle_event(GuiContext *gui, HWND wnd, UINT msg, WPARAM wparam,
   LPARAM lparam);

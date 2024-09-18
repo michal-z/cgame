@@ -142,8 +142,10 @@ gui_deinit(GuiContext *gui)
 
 void
 gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
-  ID3D12RootSignature *pso_rs)
+  ID3D12RootSignature *pso_rs, const GuiDrawArgs *args)
 {
+  assert(gui && gpu && pso && pso_rs && args);
+
   GpuUploadBufferRegion upload_vb = gpu_alloc_upload_memory(gpu,
     MAX_VERTEX_BUFFER);
   GpuUploadBufferRegion upload_ib = gpu_alloc_upload_memory(gpu,
@@ -190,7 +192,7 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
         },
         .vertex_size = sizeof(GuiVertex),
         .vertex_alignment = NK_ALIGNOF(GuiVertex),
-        .global_alpha = 1.0f,
+        .global_alpha = args->global_alpha,
         .shape_AA = NK_ANTI_ALIASING_ON,
         .line_AA = NK_ANTI_ALIASING_ON,
         .circle_segment_count = 22,
