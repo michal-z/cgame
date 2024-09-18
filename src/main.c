@@ -56,6 +56,7 @@ struct GameState
     b2WorldId world;
     b2Profile max_profile;
     b2Profile total_profile;
+    int32_t total_num_steps;
   } phy;
 };
 static_assert(sizeof(GameState) <= 128 * 1024);
@@ -619,6 +620,7 @@ game_update(GameState *game_state)
   GpuContext *gpu = &game_state->gpu_context;
 
   b2World_Step(game_state->phy.world, 1.0f / 60.0f, 1);
+  game_state->phy.total_num_steps += 1;
 
   for (uint32_t i = 0; i < game_state->objects_num; ++i) {
     b2BodyId body_id = *(b2BodyId *)&game_state->objects[i].phy_body_id;
@@ -640,17 +642,103 @@ game_update(GameState *game_state)
   }
 
   GuiContext *gui = &game_state->gui_context;
-  float scale = gui->dpi_scale_factor;
+  float dpi_scale = gui->dpi_scale_factor;
   struct nk_context *nkctx = &gui->nkctx;
 
-  if (nk_begin(nkctx, "Statistics", nk_rect(10.0f * scale, 10.0f * scale,
-    scale * 300.0f, scale * 300.0f), NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
-    NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE | NK_WINDOW_TITLE))
+  b2Profile phy_avg_profile = {0};
+  b2Profile phy_profile = b2World_GetProfile(game_state->phy.world);
+  {
+    const b2Profile *p = &phy_profile;
+    b2Profile *mp = &game_state->phy.max_profile;
+
+    mp->step = b2MaxFloat(mp->step, p->step);
+    mp->pairs = b2MaxFloat(mp->pairs, p->pairs);
+    mp->collide = b2MaxFloat(mp->collide, p->collide);
+    mp->solve = b2MaxFloat(mp->solve, p->solve);
+    mp->buildIslands = b2MaxFloat(mp->buildIslands, p->buildIslands);
+    mp->solveConstraints = b2MaxFloat(mp->solveConstraints, p->solveConstraints);
+    mp->prepareTasks = b2MaxFloat(mp->prepareTasks, p->prepareTasks);
+    mp->solverTasks = b2MaxFloat(mp->solverTasks, p->solverTasks);
+    mp->prepareConstraints = b2MaxFloat(mp->prepareConstraints,
+      p->prepareConstraints);
+    mp->integrateVelocities = b2MaxFloat(mp->integrateVelocities,
+      p->integrateVelocities);
+    mp->warmStart = b2MaxFloat(mp->warmStart, p->warmStart);
+    mp->solveVelocities = b2MaxFloat(mp->solveVelocities, p->solveVelocities);
+    mp->integratePositions = b2MaxFloat(mp->integratePositions,
+      p->integratePositions);
+    mp->relaxVelocities = b2MaxFloat(mp->relaxVelocities, p->relaxVelocities);
+    mp->applyRestitution = b2MaxFloat(mp->applyRestitution, p->applyRestitution);
+    mp->storeImpulses = b2MaxFloat(mp->storeImpulses, p->storeImpulses);
+    mp->finalizeBodies = b2MaxFloat(mp->finalizeBodies, p->finalizeBodies);
+    mp->sleepIslands = b2MaxFloat(mp->sleepIslands, p->sleepIslands);
+    mp->splitIslands = b2MaxFloat(mp->splitIslands, p->splitIslands);
+    mp->hitEvents = b2MaxFloat(mp->hitEvents, p->hitEvents);
+    mp->broadphase = b2MaxFloat(mp->broadphase, p->broadphase);
+    mp->continuous = b2MaxFloat(mp->continuous, p->continuous);
+
+    b2Profile *tp = &game_state->phy.total_profile;
+    tp->step += p->step;
+    tp->pairs += p->pairs;
+    tp->collide += p->collide;
+    tp->solve += p->solve;
+    tp->buildIslands += p->buildIslands;
+    tp->solveConstraints += p->solveConstraints;
+    tp->prepareTasks += p->prepareTasks;
+    tp->solverTasks += p->solverTasks;
+    tp->prepareConstraints += p->prepareConstraints;
+    tp->integrateVelocities += p->integrateVelocities;
+    tp->warmStart += p->warmStart;
+    tp->solveVelocities += p->solveVelocities;
+    tp->integratePositions += p->integratePositions;
+    tp->relaxVelocities += p->relaxVelocities;
+    tp->applyRestitution += p->applyRestitution;
+    tp->storeImpulses += p->storeImpulses;
+    tp->finalizeBodies += p->finalizeBodies;
+    tp->sleepIslands += p->sleepIslands;
+    tp->splitIslands += p->splitIslands;
+    tp->hitEvents += p->hitEvents;
+    tp->broadphase += p->broadphase;
+    tp->continuous += p->continuous;
+
+    b2Profile *ap = &phy_avg_profile;
+    if (game_state->phy.total_num_steps > 0) {
+      float scale = 1.0f / game_state->phy.total_num_steps;
+
+      ap->step = scale * tp->step;
+      ap->pairs = scale * tp->pairs;
+      ap->collide = scale * tp->collide;
+      ap->solve = scale * tp->solve;
+      ap->buildIslands = scale * tp->buildIslands;
+      ap->solveConstraints = scale * tp->solveConstraints;
+      ap->prepareTasks = scale * tp->prepareTasks;
+      ap->solverTasks = scale * tp->solverTasks;
+      ap->prepareConstraints = scale * tp->prepareConstraints;
+      ap->integrateVelocities = scale * tp->integrateVelocities;
+      ap->warmStart = scale * tp->warmStart;
+      ap->solveVelocities = scale * tp->solveVelocities;
+      ap->integratePositions = scale * tp->integratePositions;
+      ap->relaxVelocities = scale * tp->relaxVelocities;
+      ap->applyRestitution = scale * tp->applyRestitution;
+      ap->storeImpulses = scale * tp->storeImpulses;
+      ap->finalizeBodies = scale * tp->finalizeBodies;
+      ap->sleepIslands = scale * tp->sleepIslands;
+      ap->splitIslands = scale * tp->splitIslands;
+      ap->hitEvents = scale * tp->hitEvents;
+      ap->broadphase = scale * tp->broadphase;
+      ap->continuous = scale * tp->continuous;
+    }
+  }
+
+  if (nk_begin(nkctx, "Statistics", nk_rect(10.0f * dpi_scale, 10.0f * dpi_scale,
+    dpi_scale * 350.0f, dpi_scale * 300.0f), NK_WINDOW_BORDER |
+    NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE | NK_WINDOW_MINIMIZABLE |
+    NK_WINDOW_TITLE))
   {
     if (nk_tree_push(nkctx, NK_TREE_TAB, "Physics counters", NK_MINIMIZED)) {
       b2Counters s = b2World_GetCounters(game_state->phy.world);
 
-      nk_layout_row_dynamic(nkctx, FONT_NORMAL_SIZE * scale, 1);
+      nk_layout_row_dynamic(nkctx, FONT_NORMAL_SIZE * dpi_scale, 1);
 
       nk_labelf(nkctx, NK_TEXT_LEFT,
         "bodies/shapes/contacts/joints = %d/%d/%d/%d", s.bodyCount,
@@ -663,6 +751,28 @@ game_update(GameState *game_state)
         s.stackUsed / 1024);
       nk_labelf(nkctx, NK_TEXT_LEFT, "total allocation = %d K",
         s.byteCount / 1024);
+
+      nk_tree_pop(nkctx);
+    }
+
+    if (nk_tree_push(nkctx, NK_TREE_TAB, "Physics profile", NK_MINIMIZED)) {
+      nk_layout_row_dynamic(nkctx, FONT_NORMAL_SIZE * dpi_scale, 1);
+
+      const b2Profile *p = &phy_profile;
+      const b2Profile *ap = &phy_avg_profile;
+      const b2Profile *mp = &game_state->phy.max_profile;
+
+      nk_labelf(nkctx, NK_TEXT_LEFT, "step [avg] (max) = %.2f [%.2f] (%.2f)",
+        p->step, ap->step, mp->step);
+      nk_labelf(nkctx, NK_TEXT_LEFT, "pairs [avg] (max) = %.2f [%.2f] (%.2f)",
+        p->pairs, ap->pairs, mp->pairs);
+      nk_labelf(nkctx, NK_TEXT_LEFT, "collide [avg] (max) = %.2f [%.2f] (%.2f)",
+        p->collide, ap->collide, mp->collide);
+      nk_labelf(nkctx, NK_TEXT_LEFT, "solve [avg] (max) = %.2f [%.2f] (%.2f)",
+        p->solve, ap->solve, mp->solve);
+      nk_labelf(nkctx, NK_TEXT_LEFT,
+        "builds island [avg] (max) = %.2f [%.2f] (%.2f)", p->buildIslands,
+        ap->buildIslands, mp->buildIslands);
 
       nk_tree_pop(nkctx);
     }
