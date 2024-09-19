@@ -8,10 +8,8 @@
 #define OBJ_MAX_TEXTURES 64
 
 #define FONT_NORMAL 0
-#define FONT_LARGE 1
 #define FONT_MAX 4
 #define FONT_NORMAL_HEIGHT 18.0f
-#define FONT_LARGE_HEIGHT 30.0f
 
 #define MESH_SQUARE_1M 0
 #define MESH_MAX 32
@@ -56,6 +54,7 @@ typedef struct GameState
     b2Profile total_profile;
     int32_t num_steps;
     b2JointId mouse_joint;
+    b2BodyId mouse_fixed_body;
   } phy;
 } GameState;
 
@@ -225,10 +224,7 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       b2Vec2 p = { u * world_size_x, v * world_size_y };
 
       b2Vec2 d = { 0.001f, 0.001f };
-      b2AABB box = {
-        .lowerBound = b2Sub(p, d),
-        .upperBound = b2Add(p, d),
-      };
+      b2AABB box = { b2Sub(p, d), b2Add(p, d) };
 
       MouseQueryContext query_context = { p, b2_nullBodyId };
       b2World_OverlapAABB(gs->phy.world, box, b2DefaultQueryFilter(),
@@ -236,6 +232,20 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
       if (B2_IS_NON_NULL(query_context.body)) {
         LOG("[test] world_x = %f, world_y = %f\n", p.x, p.y);
+
+        b2BodyDef body_def = b2DefaultBodyDef();
+        gs->phy.mouse_fixed_body = b2CreateBody(gs->phy.world, &body_def);
+
+        b2MouseJointDef mouse_def = b2DefaultMouseJointDef();
+        mouse_def.bodyIdA = gs->phy.mouse_fixed_body;
+        mouse_def.bodyIdB = query_context.body;
+        mouse_def.target = p;
+        mouse_def.hertz = 5.0f;
+        mouse_def.dampingRatio = 0.7f;
+        mouse_def.maxForce = 1000.0f * b2Body_GetMass(query_context.body);
+        gs->phy.mouse_joint = b2CreateMouseJoint(gs->phy.world, &mouse_def);
+
+        b2Body_SetAwake(query_context.body, true);
       }
     }
   }
@@ -331,8 +341,6 @@ game_init(GameState *game_state)
   gui_init_begin(gui, gpu);
   game_state->fonts[FONT_NORMAL] = gui_init_add_font(gui,
     "assets/fonts/DroidSans.ttf", FONT_NORMAL_HEIGHT * gui->dpi_scale_factor);
-  //game_state->fonts[FONT_LARGE] = gui_init_add_font(gui,
-    //"assets/fonts/Roboto-Regular.ttf", FONT_LARGE_HEIGHT * gui->dpi_scale_factor);
   gui_init_end(gui, gpu);
 
   nk_style_set_font(&gui->nkctx, &game_state->fonts[FONT_NORMAL]->handle);
