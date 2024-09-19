@@ -25,16 +25,13 @@
 
 #define CAMERA_VIEW_HEIGHT 12.0f
 
-typedef struct GameState GameState;
-typedef struct Mesh Mesh;
-
-struct Mesh
+typedef struct Mesh
 {
   uint32_t first_vertex;
   uint32_t num_vertices;
-};
+} Mesh;
 
-struct GameState
+typedef struct GameState
 {
   const char *name;
   GpuContext gpu_context;
@@ -48,8 +45,9 @@ struct GameState
   struct nk_font *fonts[FONT_MAX];
 
   Mesh meshes[MESH_MAX];
-  CgObject objects[OBJ_MAX];
   uint32_t meshes_num;
+
+  CgObject objects[OBJ_MAX];
   uint32_t objects_num;
 
   struct {
@@ -59,7 +57,8 @@ struct GameState
     int32_t num_steps;
     b2JointId mouse_joint;
   } phy;
-};
+} GameState;
+
 static_assert(sizeof(GameState) <= 128 * 1024);
 static_assert(sizeof(uint64_t) == sizeof(b2BodyId));
 
@@ -163,6 +162,32 @@ window_update_frame_stats(HWND window, const char *name)
   return delta_time;
 }
 
+typedef struct MouseQueryContext
+{
+  b2Vec2 point;
+  b2BodyId body;
+} MouseQueryContext;
+
+static bool
+mouse_query_callback(b2ShapeId shape, void *context)
+{
+  MouseQueryContext *query_context = context;
+  assert(query_context);
+
+  b2BodyId body = b2Shape_GetBody(shape);
+  b2BodyType body_type = b2Body_GetType(body);
+  if (body_type != b2_dynamicBody) {
+    return true; // continue query
+  }
+
+  if (b2Shape_TestPoint(shape, query_context->point)) {
+    query_context->body = body; // found shape
+    return false;
+  }
+
+  return true;
+}
+
 static LRESULT CALLBACK
 window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
@@ -192,11 +217,26 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
       float w = (float)gs->gpu_context.viewport_width;
       float h = (float)gs->gpu_context.viewport_height;
-      float u = mx / w;
-      float v = (h - my) / h;
+      float u = -0.5f + mx / w;
+      float v = -0.5f + (h - my) / h;
 
-      LOG("[test] mx = %d, my = %d\n", mx, my);
-      LOG("[test] u = %f, v = %f\n", u, v);
+      float world_size_y = CAMERA_VIEW_HEIGHT;
+      float world_size_x = world_size_y * (w / h);
+      b2Vec2 p = { u * world_size_x, v * world_size_y };
+
+      b2Vec2 d = { 0.001f, 0.001f };
+      b2AABB box = {
+        .lowerBound = b2Sub(p, d),
+        .upperBound = b2Add(p, d),
+      };
+
+      MouseQueryContext query_context = { p, b2_nullBodyId };
+      b2World_OverlapAABB(gs->phy.world, box, b2DefaultQueryFilter(),
+        mouse_query_callback, &query_context);
+
+      if (B2_IS_NON_NULL(query_context.body)) {
+        LOG("[test] world_x = %f, world_y = %f\n", p.x, p.y);
+      }
     }
   }
 
@@ -574,7 +614,7 @@ game_init(GameState *game_state)
 
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_dynamicBody;
-    body_def.position = (b2Vec2){ 0.0f, 6.0f };
+    body_def.position = (b2Vec2){ 0.25f, 6.0f };
     body_def.rotation = (b2Rot){ cosf(0.5f), sinf(0.5f) };
     body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy_world, &body_def);

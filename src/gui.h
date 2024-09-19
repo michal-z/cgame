@@ -1,23 +1,20 @@
 #pragma once
 
 typedef struct GpuContext GpuContext;
-typedef struct GuiVertex GuiVertex;
-typedef struct GuiContext GuiContext;
-typedef struct GuiDrawArgs GuiDrawArgs;
 
-struct GuiVertex
+typedef struct GuiVertex
 {
   float pos[2];
   float uv[2];
   uint8_t col[4];
-};
+} GuiVertex;
 
-struct GuiDrawArgs
+typedef struct GuiDrawArgs
 {
   float global_alpha;
-};
+} GuiDrawArgs;
 
-struct GuiContext
+typedef struct GuiContext
 {
   struct nk_context nkctx;
   struct nk_font_atlas atlas;
@@ -33,7 +30,7 @@ struct GuiContext
 
   uint32_t dpi;
   float dpi_scale_factor;
-};
+} GuiContext;
 
 void gui_init_begin(GuiContext *gui, GpuContext *gpu);
 void gui_init_end(GuiContext *gui, GpuContext *gpu);

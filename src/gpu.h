@@ -16,56 +16,48 @@
 
 #define GPU_UPLOAD_HEAP_CAPACITY (64 * 1024 * 1024)
 
-typedef struct GpuUploadMemoryHeap GpuUploadMemoryHeap;
-typedef struct GpuContext GpuContext;
-typedef struct GpuInitContextArgs GpuInitContextArgs;
-typedef struct GpuUploadBufferRegion GpuUploadBufferRegion;
-typedef struct GpuCreateTextureFromFileArgs GpuCreateTextureFromFileArgs;
-
-typedef enum GpuContextState GpuContextState;
-
-enum GpuContextState
+typedef enum GpuContextState
 {
   GpuContextState_Normal,
   GpuContextState_WindowMinimized,
   GpuContextState_WindowResized,
   GpuContextState_DeviceLost,
-};
+} GpuContextState;
 
-struct GpuUploadMemoryHeap
+typedef struct GpuUploadMemoryHeap
 {
   ID3D12Resource *buffer;
   uint8_t *cpu_base_addr;
   D3D12_GPU_VIRTUAL_ADDRESS gpu_base_addr;
   uint32_t size;
   uint32_t capacity;
-};
+} GpuUploadMemoryHeap;
 
-struct GpuUploadBufferRegion
+typedef struct GpuUploadBufferRegion
 {
   uint8_t *cpu_addr;
   D3D12_GPU_VIRTUAL_ADDRESS gpu_addr;
   ID3D12Resource *buffer;
   uint64_t buffer_offset;
   uint64_t size;
-};
+} GpuUploadBufferRegion;
 
-struct GpuCreateTextureFromFileArgs
+typedef struct GpuCreateTextureFromFileArgs
 {
   uint32_t num_mips;
   D3D12_RESOURCE_FLAGS tex_flags;
-};
+} GpuCreateTextureFromFileArgs;
 
-struct GpuInitContextArgs
+typedef struct GpuInitContextArgs
 {
   HWND window;
   uint32_t num_msaa_samples;
   float color_target_clear[4];
   D3D12_DEPTH_STENCIL_VALUE ds_target_clear;
   DXGI_FORMAT ds_target_format;
-};
+} GpuInitContextArgs;
 
-struct GpuContext
+typedef struct GpuContext
 {
   HWND window;
   int32_t viewport_width;
@@ -127,7 +119,7 @@ struct GpuContext
   GpuUploadMemoryHeap upload_heaps[GPU_MAX_BUFFERED_FRAMES];
 
   IWICImagingFactory *wic_factory;
-};
+} GpuContext;
 
 void gpu_init_context(GpuContext *gpu, const GpuInitContextArgs *args);
 void gpu_deinit_context(GpuContext *gpu);

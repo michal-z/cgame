@@ -5,13 +5,11 @@
 #include "shaders/cso/s01_vs.h"
 #include "shaders/cso/s01_ps.h"
 
-typedef struct PsoBytecode PsoBytecode;
-
-struct PsoBytecode
+typedef struct PsoBytecode
 {
   D3D12_SHADER_BYTECODE vs;
   D3D12_SHADER_BYTECODE ps;
-};
+} PsoBytecode;
 
 #define PSO_FIRST 0
 #define PSO_GUI 1
