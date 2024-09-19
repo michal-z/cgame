@@ -57,6 +57,7 @@ struct GameState
     b2Profile max_profile;
     b2Profile total_profile;
     int32_t num_steps;
+    b2JointId mouse_joint;
   } phy;
 };
 static_assert(sizeof(GameState) <= 128 * 1024);
@@ -165,6 +166,8 @@ window_update_frame_stats(HWND window, const char *name)
 static LRESULT CALLBACK
 window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
+  GameState *gs = (GameState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+
   switch (message) {
     case WM_DESTROY:
       PostQuitMessage(0);
@@ -180,12 +183,25 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       info->ptMinTrackSize = (POINT){ MIN_WINDOW_SIZE, MIN_WINDOW_SIZE };
       return 0;
     }
+    case WM_LBUTTONDOWN: {
+      if (gs == NULL) break;
+      if (B2_IS_NON_NULL(gs->phy.mouse_joint)) break;
+
+      int32_t mx = GET_X_LPARAM(lparam);
+      int32_t my = GET_Y_LPARAM(lparam);
+
+      float w = (float)gs->gpu_context.viewport_width;
+      float h = (float)gs->gpu_context.viewport_height;
+      float u = mx / w;
+      float v = (h - my) / h;
+
+      LOG("[test] mx = %d, my = %d\n", mx, my);
+      LOG("[test] u = %f, v = %f\n", u, v);
+    }
   }
 
-  GuiContext *gui = (GuiContext *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
-  if (gui)
-    if (gui_handle_event(gui, hwnd, message, wparam, lparam))
-      return 0;
+  if (gs && gui_handle_event(&gs->gui_context, hwnd, message, wparam, lparam))
+    return 0;
 
   return DefWindowProcA(hwnd, message, wparam, lparam);
 }
@@ -774,6 +790,9 @@ game_update(GameState *game_state)
         "builds island [avg] (max) = %.2f [%.2f] (%.2f)", p->buildIslands,
         ap->buildIslands, mp->buildIslands);
 
+      // TODO: Add all the rest.
+
+      nk_layout_row_dynamic(nkctx, 10.0f * dpi_scale, 1);
       nk_layout_row_dynamic(nkctx, 0.0f, 1);
       if (nk_button_label(nkctx, "Reset profile")) {
         game_state->phy.total_profile = (b2Profile){0};
@@ -903,6 +922,9 @@ main(void)
 
   GameState game_state = { .name = "cgame" };
   game_init(&game_state);
+
+  SetWindowLongPtr(game_state.gpu_context.window, GWLP_USERDATA,
+    (LONG_PTR)&game_state);
 
   bool running = true;
 

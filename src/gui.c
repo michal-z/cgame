@@ -52,7 +52,6 @@ gui_init_begin(GuiContext *gui, GpuContext *gpu)
   nk_font_atlas_init_default(&gui->atlas);
   nk_font_atlas_begin(&gui->atlas);
 
-  SetWindowLongPtr(gpu->window, GWLP_USERDATA, (LONG_PTR)gui);
   gui->dpi = GetDpiForWindow(gpu->window);
   gui->dpi_scale_factor = (float)gui->dpi / USER_DEFAULT_SCREEN_DPI;
 }
