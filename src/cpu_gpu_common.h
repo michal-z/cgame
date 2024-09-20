@@ -4,6 +4,7 @@
 #define RDH_OBJECT_BUFFER 1
 #define RDH_GUI_FONT_TEXTURE 2
 #define RDH_OBJECT_TEX0 3
+#define RDH_OBJECT_TEX1 4
 
 #if __STDC_VERSION__
 typedef float float2[2];

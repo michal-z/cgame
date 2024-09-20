@@ -579,7 +579,8 @@ game_init(GameState *game_state)
   //
   {
     const char *filenames[OBJ_MAX_TEXTURES] = {
-      "assets/textures/test.png",
+      "assets/textures/red.png",
+      "assets/textures/orange.png",
     };
 
     ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
@@ -666,7 +667,7 @@ game_init(GameState *game_state)
 
     *object = (CgObject){
       .mesh_index = MESH_SQUARE_1M,
-      .texture_index = RDH_OBJECT_TEX0,
+      .texture_index = RDH_OBJECT_TEX1,
       .phy_body_id = *(uint64_t *)&body_id,
     };
   }
