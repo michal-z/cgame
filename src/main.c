@@ -579,8 +579,8 @@ game_init(GameState *game_state)
   //
   {
     const char *filenames[OBJ_MAX_TEXTURES] = {
-      "assets/textures/red.png",
-      "assets/textures/orange.png",
+      "assets/textures/obj_tex0.png",
+      "assets/textures/obj_tex1.png",
     };
 
     ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
