@@ -187,42 +187,79 @@ mouse_query_callback(b2ShapeId shape, void *context)
   return true;
 }
 
+static b2Vec2
+screen_to_world_coords(float mx, float my, float w, float h)
+{
+  float u = -0.5f + mx / w;
+  float v = -0.5f + (h - my) / h;
+  float world_size_y = CAMERA_VIEW_HEIGHT;
+  float world_size_x = world_size_y * (w / h);
+  return (b2Vec2){ u * world_size_x, v * world_size_y };
+}
+
 static LRESULT CALLBACK
 window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
   GameState *gs = (GameState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
   switch (message) {
-    case WM_DESTROY:
+    case WM_DESTROY: {
       PostQuitMessage(0);
       return 0;
-    case WM_KEYDOWN:
+    } break;
+    case WM_KEYDOWN: {
       if (wparam == VK_ESCAPE) {
         PostQuitMessage(0);
         return 0;
       }
-      break;
+    } break;
     case WM_GETMINMAXINFO: {
       MINMAXINFO *info = (MINMAXINFO *)lparam;
       info->ptMinTrackSize = (POINT){ MIN_WINDOW_SIZE, MIN_WINDOW_SIZE };
       return 0;
-    }
+    } break;
+    case WM_MOUSEMOVE: {
+      if (gs == NULL) break;
+      if (!b2Joint_IsValid(gs->phy.mouse_joint)) {
+        gs->phy.mouse_joint = b2_nullJointId;
+      }
+      if (B2_IS_NON_NULL(gs->phy.mouse_joint)) {
+        float w = (float)gs->gpu_context.viewport_width;
+        float h = (float)gs->gpu_context.viewport_height;
+        float mx = (float)GET_X_LPARAM(lparam);
+        float my = (float)GET_Y_LPARAM(lparam);
+
+        b2Vec2 p = screen_to_world_coords(mx, my, w, h);
+        b2MouseJoint_SetTarget(gs->phy.mouse_joint, p);
+        b2Body_SetAwake(b2Joint_GetBodyB(gs->phy.mouse_joint), true);
+        return 0;
+      }
+    } break;
+    case WM_LBUTTONUP: {
+      if (gs == NULL) break;
+      if (!b2Joint_IsValid(gs->phy.mouse_joint)) {
+        gs->phy.mouse_joint = b2_nullJointId;
+      }
+      if (B2_IS_NON_NULL(gs->phy.mouse_joint)) {
+        b2DestroyJoint(gs->phy.mouse_joint);
+        gs->phy.mouse_joint = b2_nullJointId;
+
+        b2DestroyBody(gs->phy.mouse_fixed_body);
+        gs->phy.mouse_fixed_body = b2_nullBodyId;
+        return 0;
+      }
+    } break;
     case WM_LBUTTONDOWN: {
       if (gs == NULL) break;
+      if (nk_window_is_any_hovered(&gs->gui_context.nkctx)) break;
       if (B2_IS_NON_NULL(gs->phy.mouse_joint)) break;
-
-      int32_t mx = GET_X_LPARAM(lparam);
-      int32_t my = GET_Y_LPARAM(lparam);
 
       float w = (float)gs->gpu_context.viewport_width;
       float h = (float)gs->gpu_context.viewport_height;
-      float u = -0.5f + mx / w;
-      float v = -0.5f + (h - my) / h;
+      float mx = (float)GET_X_LPARAM(lparam);
+      float my = (float)GET_Y_LPARAM(lparam);
 
-      float world_size_y = CAMERA_VIEW_HEIGHT;
-      float world_size_x = world_size_y * (w / h);
-      b2Vec2 p = { u * world_size_x, v * world_size_y };
-
+      b2Vec2 p = screen_to_world_coords(mx, my, w, h);
       b2Vec2 d = { 0.001f, 0.001f };
       b2AABB box = { b2Sub(p, d), b2Add(p, d) };
 
@@ -231,8 +268,6 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
         mouse_query_callback, &query_context);
 
       if (B2_IS_NON_NULL(query_context.body)) {
-        LOG("[test] world_x = %f, world_y = %f\n", p.x, p.y);
-
         b2BodyDef body_def = b2DefaultBodyDef();
         gs->phy.mouse_fixed_body = b2CreateBody(gs->phy.world, &body_def);
 
@@ -246,8 +281,9 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
         gs->phy.mouse_joint = b2CreateMouseJoint(gs->phy.world, &mouse_def);
 
         b2Body_SetAwake(query_context.body, true);
+        return 0;
       }
-    }
+    } break;
   }
 
   if (gs && gui_handle_event(&gs->gui_context, hwnd, message, wparam, lparam))
