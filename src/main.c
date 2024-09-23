@@ -292,6 +292,7 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
           .texture_index = RDH_OBJECT_TEX1,
           .phy_body_id = *(uint64_t *)&body_id,
         };
+        return 0;
       }
     } break;
     case WM_LBUTTONDOWN: {
