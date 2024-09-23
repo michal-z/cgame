@@ -21,7 +21,7 @@
 #define NUM_MSAA_SAMPLES 4
 #define MIN_WINDOW_SIZE 400
 
-#define CAMERA_VIEW_HEIGHT 12.0f
+#define WORLD_SIZE_Y 12.0f
 
 typedef struct Mesh
 {
@@ -204,7 +204,7 @@ screen_to_world_coords(float mx, float my, float w, float h)
 {
   float u = -0.5f + mx / w;
   float v = -0.5f + (h - my) / h;
-  float world_size_y = CAMERA_VIEW_HEIGHT;
+  float world_size_y = WORLD_SIZE_Y;
   float world_size_x = world_size_y * (w / h);
   return (b2Vec2){ u * world_size_x, v * world_size_y };
 }
@@ -213,6 +213,8 @@ static LRESULT CALLBACK
 window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
   GameState *gs = (GameState *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+  if (gs == NULL)
+    return DefWindowProcA(hwnd, message, wparam, lparam);
 
   switch (message) {
     case WM_DESTROY: {
@@ -231,7 +233,6 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       return 0;
     } break;
     case WM_MOUSEMOVE: {
-      if (gs == NULL) break;
       if (!b2Joint_IsValid(gs->phy.mouse_joint)) {
         gs->phy.mouse_joint = b2_nullJointId;
       }
@@ -248,7 +249,6 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       }
     } break;
     case WM_LBUTTONUP: {
-      if (gs == NULL) break;
       if (!b2Joint_IsValid(gs->phy.mouse_joint)) {
         gs->phy.mouse_joint = b2_nullJointId;
       }
@@ -262,7 +262,6 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       }
     } break;
     case WM_RBUTTONDOWN: {
-      if (gs == NULL) break;
       if (nk_window_is_any_hovered(&gs->gui_context.nkctx)) break;
 
       float w = (float)gs->gpu_context.viewport_width;
@@ -296,7 +295,6 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       }
     } break;
     case WM_LBUTTONDOWN: {
-      if (gs == NULL) break;
       if (nk_window_is_any_hovered(&gs->gui_context.nkctx)) break;
       if (B2_IS_NON_NULL(gs->phy.mouse_joint)) break;
 
@@ -332,7 +330,7 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
     } break;
   }
 
-  if (gs && gui_handle_event(&gs->gui_context, hwnd, message, wparam, lparam))
+  if (gui_handle_event(&gs->gui_context, hwnd, message, wparam, lparam))
     return 0;
 
   return DefWindowProcA(hwnd, message, wparam, lparam);
@@ -722,11 +720,11 @@ game_init(GameState *game_state)
 
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_staticBody;
-    body_def.position = (b2Vec2){ 0.0f, -CAMERA_VIEW_HEIGHT * 0.5f - 0.5f };
+    body_def.position = (b2Vec2){ 0.0f, -WORLD_SIZE_Y * 0.5f - 0.5f };
     body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy_world, &body_def);
 
-    b2Polygon ground = b2MakeBox(CAMERA_VIEW_HEIGHT * 2, 0.5f);
+    b2Polygon ground = b2MakeBox(WORLD_SIZE_Y * 2, 0.5f);
     b2ShapeDef ground_def = b2DefaultShapeDef();
     b2CreatePolygonShape(body_id, &ground_def, &ground);
 
@@ -740,11 +738,11 @@ game_init(GameState *game_state)
 
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_staticBody;
-    body_def.position = (b2Vec2){ 0.0f, CAMERA_VIEW_HEIGHT * 0.5f + 0.5f };
+    body_def.position = (b2Vec2){ 0.0f, WORLD_SIZE_Y * 0.5f + 0.5f };
     body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy_world, &body_def);
 
-    b2Polygon ground = b2MakeBox(CAMERA_VIEW_HEIGHT * 2, 0.5f);
+    b2Polygon ground = b2MakeBox(WORLD_SIZE_Y * 2, 0.5f);
     b2ShapeDef ground_def = b2DefaultShapeDef();
     b2CreatePolygonShape(body_id, &ground_def, &ground);
 
@@ -762,7 +760,7 @@ game_init(GameState *game_state)
 
       b2BodyDef body_def = b2DefaultBodyDef();
       body_def.type = b2_staticBody;
-      body_def.position = (b2Vec2){ sign * CAMERA_VIEW_HEIGHT * 0.75f,
+      body_def.position = (b2Vec2){ sign * WORLD_SIZE_Y * 0.75f,
         i * 1.1f };
       body_def.userData = object;
       b2BodyId body_id = b2CreateBody(phy_world, &body_def);
@@ -783,7 +781,7 @@ game_init(GameState *game_state)
 
       b2BodyDef body_def = b2DefaultBodyDef();
       body_def.type = b2_staticBody;
-      body_def.position = (b2Vec2){ sign * CAMERA_VIEW_HEIGHT * 0.75f,
+      body_def.position = (b2Vec2){ sign * WORLD_SIZE_Y * 0.75f,
         -i * 1.1f };
       body_def.userData = object;
       b2BodyId body_id = b2CreateBody(phy_world, &body_def);
@@ -1065,7 +1063,7 @@ game_draw(GameState *game_state)
   // Bind per frame constant data at root index 1.
   {
     float aspect = (float)gpu->viewport_width / gpu->viewport_height;
-    float map_size = CAMERA_VIEW_HEIGHT;
+    float map_size = WORLD_SIZE_Y;
 
     GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
       sizeof(CgPerFrameConst));
