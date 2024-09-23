@@ -64,6 +64,9 @@ static_assert(sizeof(uint64_t) == sizeof(b2BodyId));
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
 
+b2Polygon g_box1m;
+b2ShapeDef g_box1m_def;
+
 void
 m4x4_ortho_off_center(float4x4 m, float l, float r, float t, float b, float n,
   float f)
@@ -187,6 +190,15 @@ mouse_query_callback(b2ShapeId shape, void *context)
   return true;
 }
 
+static bool
+overlap_any_query_callback(b2ShapeId shape, void *context)
+{
+  MouseQueryContext *query_context = context;
+  assert(query_context);
+  query_context->body = b2Shape_GetBody(shape);
+  return false;
+}
+
 static b2Vec2
 screen_to_world_coords(float mx, float my, float w, float h)
 {
@@ -247,6 +259,40 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
         b2DestroyBody(gs->phy.mouse_fixed_body);
         gs->phy.mouse_fixed_body = b2_nullBodyId;
         return 0;
+      }
+    } break;
+    case WM_RBUTTONDOWN: {
+      if (gs == NULL) break;
+      if (nk_window_is_any_hovered(&gs->gui_context.nkctx)) break;
+
+      float w = (float)gs->gpu_context.viewport_width;
+      float h = (float)gs->gpu_context.viewport_height;
+      float mx = (float)GET_X_LPARAM(lparam);
+      float my = (float)GET_Y_LPARAM(lparam);
+
+      b2Vec2 p = screen_to_world_coords(mx, my, w, h);
+      b2Vec2 d = { 0.5f, 0.5f };
+      b2AABB box = { b2Sub(p, d), b2Add(p, d) };
+
+      MouseQueryContext query_context = { p, b2_nullBodyId };
+      b2World_OverlapAABB(gs->phy.world, box, b2DefaultQueryFilter(),
+        overlap_any_query_callback, &query_context);
+
+      if (B2_IS_NULL(query_context.body)) {
+        CgObject *object = &gs->objects[gs->objects_num++];
+
+        b2BodyDef body_def = b2DefaultBodyDef();
+        body_def.type = b2_dynamicBody;
+        body_def.position = p;
+        body_def.userData = object;
+        b2BodyId body_id = b2CreateBody(gs->phy.world, &body_def);
+        b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
+
+        *object = (CgObject){
+          .mesh_index = MESH_SQUARE_1M,
+          .texture_index = RDH_OBJECT_TEX1,
+          .phy_body_id = *(uint64_t *)&body_id,
+        };
       }
     } break;
     case WM_LBUTTONDOWN: {
@@ -634,8 +680,8 @@ game_init(GameState *game_state)
   }
   b2WorldId phy_world = game_state->phy.world;
 
-  b2Polygon box1m = b2MakeBox(0.5f, 0.5f);
-  b2ShapeDef box1m_def = b2DefaultShapeDef();
+  g_box1m = b2MakeBox(0.5f, 0.5f);
+  g_box1m_def = b2DefaultShapeDef();
 
   {
     CgObject *object = &game_state->objects[game_state->objects_num++];
@@ -646,7 +692,7 @@ game_init(GameState *game_state)
     body_def.rotation = (b2Rot){ cosf(0.0f), sinf(0.0f) };
     body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy_world, &body_def);
-    b2CreatePolygonShape(body_id, &box1m_def, &box1m);
+    b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
 
     *object = (CgObject){
       .mesh_index = MESH_SQUARE_1M,
@@ -663,7 +709,7 @@ game_init(GameState *game_state)
     body_def.rotation = (b2Rot){ cosf(0.5f), sinf(0.5f) };
     body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy_world, &body_def);
-    b2CreatePolygonShape(body_id, &box1m_def, &box1m);
+    b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
 
     *object = (CgObject){
       .mesh_index = MESH_SQUARE_1M,
@@ -676,7 +722,7 @@ game_init(GameState *game_state)
 
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_staticBody;
-    body_def.position = (b2Vec2){ 0.0f, -CAMERA_VIEW_HEIGHT * 0.5f };
+    body_def.position = (b2Vec2){ 0.0f, -CAMERA_VIEW_HEIGHT * 0.5f - 0.5f };
     body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy_world, &body_def);
 
@@ -688,6 +734,67 @@ game_init(GameState *game_state)
       .mesh_index = MESH_INVALID,
       .phy_body_id = *(uint64_t *)&body_id,
     };
+  }
+  {
+    CgObject *object = &game_state->objects[game_state->objects_num++];
+
+    b2BodyDef body_def = b2DefaultBodyDef();
+    body_def.type = b2_staticBody;
+    body_def.position = (b2Vec2){ 0.0f, CAMERA_VIEW_HEIGHT * 0.5f + 0.5f };
+    body_def.userData = object;
+    b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+
+    b2Polygon ground = b2MakeBox(CAMERA_VIEW_HEIGHT * 2, 0.5f);
+    b2ShapeDef ground_def = b2DefaultShapeDef();
+    b2CreatePolygonShape(body_id, &ground_def, &ground);
+
+    *object = (CgObject){
+      .mesh_index = MESH_INVALID,
+      .phy_body_id = *(uint64_t *)&body_id,
+    };
+  }
+
+  for (int32_t i = 0; i < 6; ++i) {
+    for (int32_t sign = -1; sign < 2; ++sign) {
+      if (sign == 0) continue;
+
+      CgObject *object = &game_state->objects[game_state->objects_num++];
+
+      b2BodyDef body_def = b2DefaultBodyDef();
+      body_def.type = b2_staticBody;
+      body_def.position = (b2Vec2){ sign * CAMERA_VIEW_HEIGHT * 0.75f,
+        i * 1.1f };
+      body_def.userData = object;
+      b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+      b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
+
+      *object = (CgObject){
+        .mesh_index = MESH_SQUARE_1M,
+        .texture_index = RDH_OBJECT_TEX0,
+        .phy_body_id = *(uint64_t *)&body_id,
+      };
+    }
+  }
+  for (int32_t i = 1; i < 6; ++i) {
+    for (int32_t sign = -1; sign < 2; ++sign) {
+      if (sign == 0) continue;
+
+      CgObject *object = &game_state->objects[game_state->objects_num++];
+
+      b2BodyDef body_def = b2DefaultBodyDef();
+      body_def.type = b2_staticBody;
+      body_def.position = (b2Vec2){ sign * CAMERA_VIEW_HEIGHT * 0.75f,
+        -i * 1.1f };
+      body_def.userData = object;
+      b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+      b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
+
+      *object = (CgObject){
+        .mesh_index = MESH_SQUARE_1M,
+        .texture_index = RDH_OBJECT_TEX0,
+        .phy_body_id = *(uint64_t *)&body_id,
+      };
+    }
   }
 }
 
