@@ -658,8 +658,7 @@ gpu_present_frame(GpuContext *gpu)
     gpu->frame_fence_counter));
 
   uint64_t gpu_frame_counter = ID3D12Fence_GetCompletedValue(gpu->frame_fence);
-  if ((gpu->frame_fence_counter - gpu_frame_counter) >=
-    GPU_MAX_BUFFERED_FRAMES)
+  if ((gpu->frame_fence_counter - gpu_frame_counter) >= GPU_MAX_BUFFERED_FRAMES)
   {
     VHR(ID3D12Fence_SetEventOnCompletion(gpu->frame_fence, gpu_frame_counter + 1,
       gpu->frame_fence_event));

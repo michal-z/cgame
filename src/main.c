@@ -64,8 +64,8 @@ static_assert(sizeof(uint64_t) == sizeof(b2BodyId));
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
 
-b2Polygon g_box1m;
-b2ShapeDef g_box1m_def;
+static b2Polygon g_box1m;
+static b2ShapeDef g_box1m_def;
 
 void
 m4x4_ortho_off_center(float4x4 m, float l, float r, float t, float b, float n,
