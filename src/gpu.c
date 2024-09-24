@@ -534,7 +534,7 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
   ID3D12PipelineState *pso, ID3D12RootSignature *pso_rs)
 {
   assert(gpu && tex && pso && pso_rs);
-  assert(gpu->current_cmdlist = NULL);
+  assert(gpu->current_cmdlist != NULL);
 
   D3D12_RESOURCE_DESC desc = {0};
   ID3D12Resource_GetDesc(tex, &desc);
