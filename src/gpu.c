@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "gpu.h"
+#include "cpu_gpu_common.h"
 
 #define UMH_ALLOC_ALIGNMENT 512
 
@@ -440,12 +441,48 @@ gpu_init_context(GpuContext *gpu, const GpuInitContextArgs *args)
     &IID_IWICImagingFactory, &gpu->wic_factory));
 
   LOG("[gpu] WIC factory created");
+
+  //
+  // Mipmap generator
+  //
+  {
+    uint32_t width = 2048 / 2;
+    uint32_t height = 2048 / 2;
+    for (uint32_t i = 0; i < _countof(gpu->mipgen_scratch_textures); ++i) {
+      VHR(ID3D12Device14_CreateCommittedResource3(gpu->device,
+        &(D3D12_HEAP_PROPERTIES){ .Type = D3D12_HEAP_TYPE_DEFAULT },
+        D3D12_HEAP_FLAG_NONE,
+        &(D3D12_RESOURCE_DESC1){
+          .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+          .Width = width,
+          .Height = height,
+          .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+          .DepthOrArraySize = 1,
+          .MipLevels = 1,
+          .SampleDesc = { .Count = 1 },
+          .Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+        },
+        D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS, NULL, NULL, 0, NULL,
+        &IID_ID3D12Resource, &gpu->mipgen_scratch_textures[i]));
+
+      ID3D12Device14_CreateUnorderedAccessView(gpu->device,
+        gpu->mipgen_scratch_textures[i], NULL, NULL,
+        (D3D12_CPU_DESCRIPTOR_HANDLE){
+          .ptr = gpu->shader_dheap_start_cpu.ptr + (RDH_MIPGEN_SCRATCH0 + i)
+            * gpu->shader_dheap_descriptor_size
+        });
+    }
+    LOG("[gpu] Mipmap generator scratch textures created");
+  }
 }
 
 void
 gpu_deinit_context(GpuContext *gpu)
 {
   assert(gpu);
+  for (uint32_t i = 0; i < _countof(gpu->mipgen_scratch_textures); ++i) {
+    SAFE_RELEASE(gpu->mipgen_scratch_textures[i]);
+  }
   SAFE_RELEASE(gpu->wic_factory);
   for (uint32_t i = 0; i < GPU_MAX_COMMAND_LISTS; ++i) {
     SAFE_RELEASE(gpu->command_lists[i]);
@@ -490,6 +527,109 @@ gpu_deinit_context(GpuContext *gpu)
     gpu->debug_device = NULL;
   }
 #endif
+}
+
+void
+gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
+  ID3D12PipelineState *pso, ID3D12RootSignature *pso_rs)
+{
+  assert(gpu && tex && pso && pso_rs);
+  assert(gpu->current_cmdlist = NULL);
+
+  D3D12_RESOURCE_DESC desc = {0};
+  ID3D12Resource_GetDesc(tex, &desc);
+  assert(desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM);
+  assert(desc.Width <= 2048 && desc.Height <= 2048);
+  assert(desc.Width == desc.Height);
+  assert(desc.MipLevels > 1);
+
+  ID3D12GraphicsCommandList10 *cmdlist = gpu->current_cmdlist;
+  ID3D12GraphicsCommandList10_SetComputeRootSignature(cmdlist, pso_rs);
+  ID3D12GraphicsCommandList10_SetPipelineState(cmdlist, pso);
+
+  uint32_t total_num_mips = (uint32_t)(desc.MipLevels - 1);
+  uint32_t current_src_mip_level = 0;
+
+  for (;;) {
+    uint32_t dispatch_num_mips = total_num_mips >= 4 ? 4 : total_num_mips;
+
+    ID3D12GraphicsCommandList10_SetComputeRoot32BitConstants(cmdlist, 0, 3,
+      (uint32_t[]){ current_src_mip_level, dispatch_num_mips, tex_rdh_idx }, 0);
+
+    uint32_t num_groups_x = NK_MAX(
+      (uint32_t)desc.Width >> (3u + current_src_mip_level), 1u);
+    uint32_t num_groups_y = NK_MAX(
+      desc.Height >> (3u + current_src_mip_level), 1u);
+
+    ID3D12GraphicsCommandList10_Dispatch(cmdlist, num_groups_x, num_groups_y, 1);
+
+    for (uint32_t i = 0; i < _countof(gpu->mipgen_scratch_textures); ++i) {
+      ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+        &(D3D12_BARRIER_GROUP){
+          .Type = D3D12_BARRIER_TYPE_TEXTURE,
+          .NumBarriers = 1,
+          .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+            .SyncBefore = D3D12_BARRIER_SYNC_NON_PIXEL_SHADING,
+            .SyncAfter = D3D12_BARRIER_SYNC_COPY,
+            .AccessBefore = D3D12_BARRIER_ACCESS_UNORDERED_ACCESS,
+            .AccessAfter = D3D12_BARRIER_ACCESS_COPY_SOURCE,
+            .LayoutBefore = D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS,
+            .LayoutAfter = D3D12_BARRIER_LAYOUT_COPY_SOURCE,
+            .pResource = gpu->mipgen_scratch_textures[i],
+          },
+        });
+    }
+    ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+      &(D3D12_BARRIER_GROUP){
+        .Type = D3D12_BARRIER_TYPE_TEXTURE,
+        .NumBarriers = 1,
+        .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+          .SyncBefore = D3D12_BARRIER_SYNC_NON_PIXEL_SHADING,
+          .SyncAfter = D3D12_BARRIER_SYNC_COPY,
+          .AccessBefore = D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+          .AccessAfter = D3D12_BARRIER_ACCESS_COPY_DEST,
+          .LayoutBefore = D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+          .LayoutAfter = D3D12_BARRIER_LAYOUT_COPY_DEST,
+          .pResource = tex,
+        },
+      });
+
+    // COPY
+
+    for (uint32_t i = 0; i < _countof(gpu->mipgen_scratch_textures); ++i) {
+      ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+        &(D3D12_BARRIER_GROUP){
+          .Type = D3D12_BARRIER_TYPE_TEXTURE,
+          .NumBarriers = 1,
+          .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+            .SyncBefore = D3D12_BARRIER_SYNC_COPY,
+            .SyncAfter = D3D12_BARRIER_SYNC_NON_PIXEL_SHADING,
+            .AccessBefore = D3D12_BARRIER_ACCESS_COPY_SOURCE,
+            .AccessAfter = D3D12_BARRIER_ACCESS_UNORDERED_ACCESS,
+            .LayoutBefore = D3D12_BARRIER_LAYOUT_COPY_SOURCE,
+            .LayoutAfter = D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS,
+            .pResource = gpu->mipgen_scratch_textures[i],
+          },
+        });
+    }
+    ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
+      &(D3D12_BARRIER_GROUP){
+        .Type = D3D12_BARRIER_TYPE_TEXTURE,
+        .NumBarriers = 1,
+        .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
+          .SyncBefore = D3D12_BARRIER_SYNC_COPY,
+          .SyncAfter = D3D12_BARRIER_SYNC_NON_PIXEL_SHADING,
+          .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
+          .AccessAfter = D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+          .LayoutBefore = D3D12_BARRIER_LAYOUT_COPY_DEST,
+          .LayoutAfter = D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+          .pResource = tex,
+        },
+      });
+
+    if ((total_num_mips -= dispatch_num_mips) == 0) break;
+    current_src_mip_level += dispatch_num_mips;
+  }
 }
 
 ID3D12GraphicsCommandList10 *

@@ -119,6 +119,8 @@ typedef struct GpuContext
   GpuUploadMemoryHeap upload_heaps[GPU_MAX_BUFFERED_FRAMES];
 
   IWICImagingFactory *wic_factory;
+
+  ID3D12Resource *mipgen_scratch_textures[4];
 } GpuContext;
 
 void gpu_init_context(GpuContext *gpu, const GpuInitContextArgs *args);
@@ -128,12 +130,15 @@ void gpu_resolve_render_target(GpuContext *gpu);
 void gpu_present_frame(GpuContext *gpu);
 GpuUploadBufferRegion gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size);
 
+void gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex,
+  uint32_t tex_rdh_idx, ID3D12PipelineState *pso, ID3D12RootSignature *pso_rs);
+
 ID3D12GraphicsCommandList10 *gpu_begin_command_list(GpuContext *gpu);
 void gpu_end_command_list(GpuContext *gpu);
 void gpu_flush_command_lists(GpuContext *gpu);
 void gpu_wait_for_completion(GpuContext *gpu);
 
-/// `tex` layout must have: D3D12_BARRIER_LAYOUT_COPY_DEST
+/// Expected `tex` layout is D3D12_BARRIER_LAYOUT_COPY_DEST
 void gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,
   uint32_t subresource, uint8_t *data, uint32_t data_row_pitch);
 ID3D12Resource *gpu_create_texture_from_file(GpuContext *gpu,
