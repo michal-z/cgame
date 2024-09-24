@@ -552,7 +552,9 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
   uint32_t current_src_mip_level = 0;
 
   for (;;) {
-    uint32_t dispatch_num_mips = total_num_mips >= 4 ? 4 : total_num_mips;
+    uint32_t dispatch_num_mips =
+      total_num_mips >= _countof(gpu->mipgen_scratch_textures) ?
+      _countof(gpu->mipgen_scratch_textures) : total_num_mips;
 
     ID3D12GraphicsCommandList10_SetComputeRoot32BitConstants(cmdlist, 0, 3,
       (uint32_t[]){ current_src_mip_level, dispatch_num_mips, tex_rdh_idx }, 0);
