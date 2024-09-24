@@ -542,6 +542,7 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
   assert(desc.Width <= 2048 && desc.Height <= 2048);
   assert(desc.Width == desc.Height);
   assert(desc.MipLevels > 1);
+  assert(desc.DepthOrArraySize == 1);
 
   ID3D12GraphicsCommandList10 *cmdlist = gpu->current_cmdlist;
   ID3D12GraphicsCommandList10_SetComputeRootSignature(cmdlist, pso_rs);
