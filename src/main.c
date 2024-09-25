@@ -220,7 +220,7 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
     case WM_DESTROY: {
       PostQuitMessage(0);
       return 0;
-    } break;
+    }
     case WM_KEYDOWN: {
       if (wparam == VK_ESCAPE) {
         PostQuitMessage(0);
@@ -231,7 +231,7 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       MINMAXINFO *info = (MINMAXINFO *)lparam;
       info->ptMinTrackSize = (POINT){ MIN_WINDOW_SIZE, MIN_WINDOW_SIZE };
       return 0;
-    } break;
+    }
     case WM_MOUSEMOVE: {
       if (!b2Joint_IsValid(gs->phy.mouse_joint)) {
         gs->phy.mouse_joint = b2_nullJointId;
