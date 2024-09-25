@@ -552,6 +552,9 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
   uint32_t current_src_mip_level = 0;
 
   for (;;) {
+    //
+    // 1. Dispatch
+    //
     uint32_t dispatch_num_mips =
       total_num_mips >= _countof(gpu->mipgen_scratch_textures) ?
       _countof(gpu->mipgen_scratch_textures) : total_num_mips;
@@ -566,6 +569,9 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
 
     ID3D12GraphicsCommandList10_Dispatch(cmdlist, num_groups_x, num_groups_y, 1);
 
+    //
+    // 2. Barriers for copying
+    //
     for (uint32_t i = 0; i < _countof(gpu->mipgen_scratch_textures); ++i) {
       ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
         &(D3D12_BARRIER_GROUP){
@@ -597,8 +603,33 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
         },
       });
 
-    // COPY
+    //
+    // 3. Copy
+    //
+    for (uint32_t mip = 0; mip < dispatch_num_mips; ++mip) {
+      uint32_t subresource = mip + 1 + current_src_mip_level;
 
+      ID3D12GraphicsCommandList10_CopyTextureRegion(cmdlist,
+        &(D3D12_TEXTURE_COPY_LOCATION){
+          .pResource = tex,
+          .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+          .SubresourceIndex = subresource,
+        },
+        0, 0, 0,
+        &(D3D12_TEXTURE_COPY_LOCATION){
+          .pResource = gpu->mipgen_scratch_textures[mip],
+          .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+          .SubresourceIndex = 0,
+        },
+        &(D3D12_BOX){
+          0, 0, 0,
+          (uint32_t)(desc.Width >> subresource), desc.Height >> subresource, 1,
+        });
+    }
+
+    //
+    // 4. Barriers for dispatch
+    //
     for (uint32_t i = 0; i < _countof(gpu->mipgen_scratch_textures); ++i) {
       ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
         &(D3D12_BARRIER_GROUP){
