@@ -534,7 +534,7 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
   ID3D12PipelineState *pso, ID3D12RootSignature *pso_rs)
 {
   assert(gpu && tex && pso && pso_rs);
-  assert(gpu->current_cmdlist != NULL);
+  assert(gpu->current_cmdlist);
 
 #if GPU_ENABLE_DEBUG_LAYER
   ID3D12DebugCommandList3_AssertTextureLayout(gpu->debug_current_cmdlist, tex, 0,
