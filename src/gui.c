@@ -176,8 +176,8 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
   ID3D12GraphicsCommandList10_SetGraphicsRootConstantBufferView(cmdlist, 0,
     upload_cb.gpu_addr);
 
+  struct nk_buffer vbuf, ibuf;
   {
-    struct nk_buffer vbuf, ibuf;
     nk_buffer_init_fixed(&vbuf, upload_vb.cpu_addr, MAX_VERTEX_BUFFER);
     nk_buffer_init_fixed(&ibuf, upload_ib.cpu_addr, MAX_INDEX_BUFFER);
 
@@ -190,7 +190,7 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
           { NK_VERTEX_LAYOUT_END },
         },
         .vertex_size = sizeof(GuiVertex),
-        .vertex_alignment = NK_ALIGNOF(GuiVertex),
+        .vertex_alignment = alignof(GuiVertex),
         .global_alpha = args->global_alpha,
         .shape_AA = NK_ANTI_ALIASING_ON,
         .line_AA = NK_ANTI_ALIASING_ON,
@@ -202,9 +202,9 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
   }
 
   ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->vertex_buffer, 0,
-    upload_vb.buffer, upload_vb.buffer_offset, MAX_VERTEX_BUFFER);
+    upload_vb.buffer, upload_vb.buffer_offset, vbuf.allocated);
   ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->index_buffer, 0,
-    upload_ib.buffer, upload_ib.buffer_offset, MAX_INDEX_BUFFER);
+    upload_ib.buffer, upload_ib.buffer_offset, ibuf.allocated);
 
   ID3D12GraphicsCommandList10_Barrier(cmdlist, 1,
     &(D3D12_BARRIER_GROUP){
