@@ -329,24 +329,19 @@ gui_handle_event(GuiContext *gui, HWND wnd, UINT msg, WPARAM wparam,
 
         case 'C': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_COPY, down); return true; }
-          break;
-        }
+        } break;
         case 'V': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_PASTE, down); return true; }
-          break;
-        }
+        } break;
         case 'X': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_CUT, down); return true; }
-          break;
-        }
+        } break;
         case 'Z': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_TEXT_UNDO, down); return true; }
-          break;
-        }
+        } break;
         case 'R': {
           if (ctrl) { nk_input_key(ctx, NK_KEY_TEXT_REDO, down); return true; }
-          break;
-        }
+        } break;
       }
       return 0;
     }
@@ -355,8 +350,7 @@ gui_handle_event(GuiContext *gui, HWND wnd, UINT msg, WPARAM wparam,
         nk_input_unicode(ctx, (nk_rune)wparam);
         return true;
       }
-      break;
-    }
+    } break;
     case WM_LBUTTONDOWN: {
       nk_input_button(ctx, NK_BUTTON_LEFT, (short)LOWORD(lparam),
         (short)HIWORD(lparam), 1);

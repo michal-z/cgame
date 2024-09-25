@@ -1044,10 +1044,8 @@ game_draw(GameState *game_state)
     GpuUploadBufferRegion upload = gpu_alloc_upload_memory(gpu,
       game_state->objects_num * sizeof(CgObject));
 
-    CgObject *obj = (CgObject *)upload.cpu_addr;
-    for (uint32_t i = 0; i < game_state->objects_num; ++i) {
-      obj[i] = game_state->objects[i];
-    }
+    memcpy(upload.cpu_addr, &game_state->objects[0], game_state->objects_num *
+      sizeof(CgObject));
 
     ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist,
       game_state->object_buffer, 0, upload.buffer, upload.buffer_offset,
