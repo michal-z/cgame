@@ -536,6 +536,11 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
   assert(gpu && tex && pso && pso_rs);
   assert(gpu->current_cmdlist != NULL);
 
+#if GPU_ENABLE_DEBUG_LAYER
+  ID3D12DebugCommandList3_AssertTextureLayout(gpu->debug_current_cmdlist, tex, 0,
+    D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+#endif
+
   D3D12_RESOURCE_DESC desc = {0};
   ID3D12Resource_GetDesc(tex, &desc);
   assert(desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM);
@@ -946,6 +951,11 @@ gpu_upload_tex2d_subresource(GpuContext *gpu, ID3D12Resource *tex,
   uint32_t subresource, uint8_t *data, uint32_t data_row_pitch)
 {
   assert(gpu && gpu->current_cmdlist && tex && data);
+
+#if GPU_ENABLE_DEBUG_LAYER
+  ID3D12DebugCommandList3_AssertTextureLayout(gpu->debug_current_cmdlist, tex,
+    subresource, D3D12_BARRIER_LAYOUT_COPY_DEST);
+#endif
 
   D3D12_RESOURCE_DESC desc = {0};
   ID3D12Resource_GetDesc(tex, &desc);
