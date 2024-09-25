@@ -177,29 +177,27 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
     upload_cb.gpu_addr);
 
   struct nk_buffer vbuf, ibuf;
-  {
-    nk_buffer_init_fixed(&vbuf, upload_vb.cpu_addr, MAX_VERTEX_BUFFER);
-    nk_buffer_init_fixed(&ibuf, upload_ib.cpu_addr, MAX_INDEX_BUFFER);
+  nk_buffer_init_fixed(&vbuf, upload_vb.cpu_addr, MAX_VERTEX_BUFFER);
+  nk_buffer_init_fixed(&ibuf, upload_ib.cpu_addr, MAX_INDEX_BUFFER);
 
-    nk_convert(&gui->nkctx, &gui->cmds, &vbuf, &ibuf,
-      &(struct nk_convert_config){
-        .vertex_layout = (struct nk_draw_vertex_layout_element[]){
-          { NK_VERTEX_POSITION, NK_FORMAT_FLOAT, NK_OFFSETOF(GuiVertex, pos) },
-          { NK_VERTEX_TEXCOORD, NK_FORMAT_FLOAT, NK_OFFSETOF(GuiVertex, uv) },
-          { NK_VERTEX_COLOR, NK_FORMAT_R8G8B8A8, NK_OFFSETOF(GuiVertex, col) },
-          { NK_VERTEX_LAYOUT_END },
-        },
-        .vertex_size = sizeof(GuiVertex),
-        .vertex_alignment = alignof(GuiVertex),
-        .global_alpha = args->global_alpha,
-        .shape_AA = NK_ANTI_ALIASING_ON,
-        .line_AA = NK_ANTI_ALIASING_ON,
-        .circle_segment_count = 22,
-        .curve_segment_count = 22,
-        .arc_segment_count = 22,
-        .tex_null = gui->tex_null,
-      });
-  }
+  nk_convert(&gui->nkctx, &gui->cmds, &vbuf, &ibuf,
+    &(struct nk_convert_config){
+      .vertex_layout = (struct nk_draw_vertex_layout_element[]){
+        { NK_VERTEX_POSITION, NK_FORMAT_FLOAT, NK_OFFSETOF(GuiVertex, pos) },
+        { NK_VERTEX_TEXCOORD, NK_FORMAT_FLOAT, NK_OFFSETOF(GuiVertex, uv) },
+        { NK_VERTEX_COLOR, NK_FORMAT_R8G8B8A8, NK_OFFSETOF(GuiVertex, col) },
+        { NK_VERTEX_LAYOUT_END },
+      },
+      .vertex_size = sizeof(GuiVertex),
+      .vertex_alignment = alignof(GuiVertex),
+      .global_alpha = args->global_alpha,
+      .shape_AA = NK_ANTI_ALIASING_ON,
+      .line_AA = NK_ANTI_ALIASING_ON,
+      .circle_segment_count = 22,
+      .curve_segment_count = 22,
+      .arc_segment_count = 22,
+      .tex_null = gui->tex_null,
+    });
 
   ID3D12GraphicsCommandList10_CopyBufferRegion(cmdlist, gui->vertex_buffer, 0,
     upload_vb.buffer, upload_vb.buffer_offset, vbuf.allocated);
@@ -216,14 +214,14 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
           .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
           .AccessAfter = D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
           .pResource = gui->vertex_buffer,
-          .Size = MAX_VERTEX_BUFFER,
+          .Size = UINT64_MAX,
         },
         { .SyncBefore = D3D12_BARRIER_SYNC_COPY,
           .SyncAfter = D3D12_BARRIER_SYNC_DRAW,
           .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
           .AccessAfter = D3D12_BARRIER_ACCESS_INDEX_BUFFER,
           .pResource = gui->index_buffer,
-          .Size = MAX_INDEX_BUFFER,
+          .Size = UINT64_MAX,
         },
       },
     });
@@ -241,13 +239,13 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
   ID3D12GraphicsCommandList10_IASetVertexBuffers(cmdlist, 0, 1,
     &(D3D12_VERTEX_BUFFER_VIEW){
       .BufferLocation = gui->vertex_buffer_addr,
-      .SizeInBytes = MAX_VERTEX_BUFFER,
+      .SizeInBytes = (uint32_t)vbuf.allocated,
       .StrideInBytes = sizeof(GuiVertex),
     });
   ID3D12GraphicsCommandList10_IASetIndexBuffer(cmdlist,
     &(D3D12_INDEX_BUFFER_VIEW){
       .BufferLocation = gui->index_buffer_addr,
-      .SizeInBytes = MAX_INDEX_BUFFER,
+      .SizeInBytes = (uint32_t)ibuf.allocated,
       .Format = DXGI_FORMAT_R16_UINT,
     });
 
