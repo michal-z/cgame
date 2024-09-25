@@ -652,7 +652,7 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
         .NumBarriers = 1,
         .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
           .SyncBefore = D3D12_BARRIER_SYNC_COPY,
-          .SyncAfter = D3D12_BARRIER_SYNC_NON_PIXEL_SHADING,
+          .SyncAfter = D3D12_BARRIER_SYNC_ALL,
           .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
           .AccessAfter = D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
           .LayoutBefore = D3D12_BARRIER_LAYOUT_COPY_DEST,

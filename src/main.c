@@ -436,6 +436,7 @@ game_init(GameState *game_state)
 
   VHR(ID3D12Device14_CreateGraphicsPipelineState(gpu->device,
     &(D3D12_GRAPHICS_PIPELINE_STATE_DESC){
+      .pRootSignature = game_state->pso_rs[PSO_FIRST],
       .VS = g_pso_bytecode[PSO_FIRST].vs,
       .PS = g_pso_bytecode[PSO_FIRST].ps,
       .BlendState = {
@@ -473,6 +474,7 @@ game_init(GameState *game_state)
 
   VHR(ID3D12Device14_CreateGraphicsPipelineState(gpu->device,
     &(D3D12_GRAPHICS_PIPELINE_STATE_DESC){
+      .pRootSignature = game_state->pso_rs[PSO_GUI],
       .VS = g_pso_bytecode[PSO_GUI].vs,
       .PS = g_pso_bytecode[PSO_GUI].ps,
       .BlendState = {
@@ -515,6 +517,21 @@ game_init(GameState *game_state)
       },
     },
     &IID_ID3D12PipelineState, &game_state->pso[PSO_GUI]));
+
+  //
+  // PSO_MIPGEN
+  //
+  VHR(ID3D12Device14_CreateRootSignature(gpu->device, 0,
+    g_pso_bytecode[PSO_MIPGEN].cs.pShaderBytecode,
+    g_pso_bytecode[PSO_MIPGEN].cs.BytecodeLength, &IID_ID3D12RootSignature,
+    &game_state->pso_rs[PSO_MIPGEN]));
+
+  VHR(ID3D12Device14_CreateComputePipelineState(gpu->device,
+    &(D3D12_COMPUTE_PIPELINE_STATE_DESC){
+      .pRootSignature = game_state->pso_rs[PSO_MIPGEN],
+      .CS = g_pso_bytecode[PSO_MIPGEN].cs,
+    },
+    &IID_ID3D12PipelineState, &game_state->pso[PSO_MIPGEN]));
 
   //
   // Object buffer (dynamic)
@@ -636,7 +653,7 @@ game_init(GameState *game_state)
       game_state->object_textures[i] = gpu_create_texture_from_file(gpu,
         filenames[i],
         &(GpuCreateTextureFromFileArgs){
-          .num_mips = 1,
+          .num_mips = 0,
         });
 
       ID3D12Device14_CreateShaderResourceView(gpu->device,
@@ -652,7 +669,7 @@ game_init(GameState *game_state)
           .NumBarriers = 1,
           .pTextureBarriers = &(D3D12_TEXTURE_BARRIER){
             .SyncBefore = D3D12_BARRIER_SYNC_COPY,
-            .SyncAfter = D3D12_BARRIER_SYNC_DRAW,
+            .SyncAfter = D3D12_BARRIER_SYNC_ALL,
             .AccessBefore = D3D12_BARRIER_ACCESS_COPY_DEST,
             .AccessAfter = D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
             .LayoutBefore = D3D12_BARRIER_LAYOUT_COPY_DEST,
@@ -660,6 +677,10 @@ game_init(GameState *game_state)
             .pResource = game_state->object_textures[i],
           },
         });
+
+      gpu_generate_mipmaps(gpu, game_state->object_textures[i],
+        RDH_OBJECT_TEX0 + i, game_state->pso[PSO_MIPGEN],
+        game_state->pso_rs[PSO_MIPGEN]);
 
       game_state->object_textures_num += 1;
     }

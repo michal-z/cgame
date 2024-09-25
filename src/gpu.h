@@ -130,6 +130,7 @@ void gpu_resolve_render_target(GpuContext *gpu);
 void gpu_present_frame(GpuContext *gpu);
 GpuUploadBufferRegion gpu_alloc_upload_memory(GpuContext *gpu, uint32_t size);
 
+/// Expected `tex` layout is D3D12_BARRIER_LAYOUT_SHADER_RESOURCE
 void gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex,
   uint32_t tex_rdh_idx, ID3D12PipelineState *pso, ID3D12RootSignature *pso_rs);
 
