@@ -563,9 +563,9 @@ gpu_generate_mipmaps(GpuContext *gpu, ID3D12Resource *tex, uint32_t tex_rdh_idx,
       (uint32_t[]){ current_src_mip_level, dispatch_num_mips, tex_rdh_idx }, 0);
 
     uint32_t num_groups_x = NK_MAX(
-      (uint32_t)desc.Width >> (3u + current_src_mip_level), 1u);
+      (uint32_t)desc.Width >> (3 + current_src_mip_level), 1);
     uint32_t num_groups_y = NK_MAX(
-      desc.Height >> (3u + current_src_mip_level), 1u);
+      desc.Height >> (3 + current_src_mip_level), 1);
 
     ID3D12GraphicsCommandList10_Dispatch(cmdlist, num_groups_x, num_groups_y, 1);
 

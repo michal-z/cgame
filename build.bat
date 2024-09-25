@@ -50,7 +50,7 @@ IF "%1"=="clean" (
 :: All shaders are kept in a single source file: "src\shaders\shaders.c".
 ::
 SET FIRST_SHADER=0
-SET LAST_SHADER=1
+SET LAST_SHADER=2
 
 SET COMPILE_HLSL=1
 IF "%1"=="hlsl" SET COMPILE_HLSL=1
@@ -63,11 +63,20 @@ IF %COMPILE_HLSL%==1 (
     SET "SH=000000%%i"
     SET SH=s!SH:~-2!
 
-    %DXC% %HLSL_FLAGS% /T vs_%HLSL_SM% /E !SH!_vs /D_!SH! src\shaders\shaders.c ^
-      /Fh %HLSL_OUT_DIR%\!SH!_vs.h
+    SET COMPUTE_SHADER=0
+    IF !SH!==s02 SET COMPUTE_SHADER=1
 
-    %DXC% %HLSL_FLAGS% /T ps_%HLSL_SM% /E !SH!_ps /D_!SH! src\shaders\shaders.c ^
-      /Fh %HLSL_OUT_DIR%\!SH!_ps.h
+    IF !COMPUTE_SHADER!==0 (
+      %DXC% %HLSL_FLAGS% /T vs_%HLSL_SM% /E !SH!_vs /D_!SH! ^
+        src\shaders\shaders.c /Fh %HLSL_OUT_DIR%\!SH!_vs.h
+
+      %DXC% %HLSL_FLAGS% /T ps_%HLSL_SM% /E !SH!_ps /D_!SH! ^
+        src\shaders\shaders.c /Fh %HLSL_OUT_DIR%\!SH!_ps.h
+    )
+    IF !COMPUTE_SHADER!==1 (
+      %DXC% %HLSL_FLAGS% /T cs_%HLSL_SM% /E !SH!_cs /D_!SH! ^
+        src\shaders\shaders.c /Fh %HLSL_OUT_DIR%\!SH!_cs.h
+    )
   )
 )
 
