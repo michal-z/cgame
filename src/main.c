@@ -3,6 +3,7 @@
 #include "cpu_gpu_common.h"
 #include "shaders.h"
 #include "gui.h"
+#include "audio.h"
 
 #define OBJ_MAX 1000
 #define OBJ_MAX_TEXTURES 64
@@ -34,6 +35,7 @@ typedef struct GameState
   const char *name;
   GpuContext gpu_context;
   GuiContext gui_context;
+  AudContext audio_context;
   ID3D12RootSignature *pso_rs[PSO_MAX];
   ID3D12PipelineState *pso[PSO_MAX];
   ID3D12Resource *vertex_buffer_static;
@@ -62,7 +64,7 @@ static_assert(sizeof(GameState) <= 128 * 1024);
 static_assert(sizeof(uint64_t) == sizeof(b2BodyId));
 
 __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
-__declspec(dllexport) extern const char *D3D12SDKPath = ".\\d3d12\\";
+__declspec(dllexport) extern const char *D3D12SDKPath = DX12_SDK_PATH;
 
 static b2Polygon g_box1m;
 static b2ShapeDef g_box1m_def;
@@ -406,6 +408,8 @@ game_init(GameState *game_state)
     window = window_create(game_state->name, (int32_t)(1280 * dpi_scale),
       (int32_t)(720 * dpi_scale));
   }
+
+  aud_init_context(&game_state->audio_context);
 
   gpu_init_context(&game_state->gpu_context,
     &(GpuInitContextArgs){
@@ -828,6 +832,8 @@ game_deinit(GameState *game_state)
   b2DestroyWorld(game_state->phy.world);
 
   gui_deinit(&game_state->gui_context);
+
+  aud_deinit_context(&game_state->audio_context);
 
   SAFE_RELEASE(game_state->vertex_buffer_static);
   SAFE_RELEASE(game_state->object_buffer);

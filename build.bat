@@ -14,6 +14,7 @@ SET C_FLAGS=/std:c17 /experimental:c11atomics /GR- /nologo /Gm- /WX /Wall ^
   /I"src\deps" ^
   /I"src\deps\d3d12" ^
   /I"src\deps\nuklear" ^
+  /I"src\deps\xaudio2" ^
   /I"src\deps\box2d\include"
 
 IF %CONFIG%==D SET C_FLAGS=%C_FLAGS% /GS /Zi /Od /D"_DEBUG" /MTd /RTCs

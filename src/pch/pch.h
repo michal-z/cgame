@@ -6,6 +6,7 @@
 #include <windowsx.h>
 #define COBJMACROS
 #include "d3d12.h"
+#include "xaudio2.h"
 #include <dxgi1_6.h>
 #include <wincodec.h>
 
@@ -21,6 +22,8 @@
 
 #include "nuklear_with_config.h"
 #include "box2d/box2d.h"
+
+#define DX12_SDK_PATH ".\\d3d12\\"
 
 #define LOG(...) do \
 { \
