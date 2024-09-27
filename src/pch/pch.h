@@ -10,6 +10,11 @@
 #include <dxgi1_6.h>
 #include <wincodec.h>
 
+#pragma warning(push)
+#pragma warning(disable : 4668)
+#include <mfapi.h>
+#pragma warning(pop)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>

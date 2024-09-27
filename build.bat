@@ -123,6 +123,7 @@ IF NOT "%1"=="hlsl" (
   %CC% %C_FLAGS% /MP /Fp:"pch.pch" /Fd:"pch.pdb" /Fe:"%NAME%.exe" ^
     /Yu"pch.h" "src\*.c" ^
     /link %LINK_FLAGS% d3d12.lib dxgi.lib user32.lib ole32.lib windowscodecs.lib ^
+    mfplat.lib ^
     pch.lib nuklear.lib box2d.lib
 
   IF EXIST "*.obj" DEL "*.obj"
