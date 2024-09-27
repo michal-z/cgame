@@ -11,6 +11,30 @@ static const WAVEFORMATEX g_optimal_fmt = {
   .cbSize = sizeof(WAVEFORMATEX),
 };
 
+static uint8_t *
+decode_audio_from_file(const char *filename)
+{
+  wchar_t filename_w[MAX_PATH];
+  mbstowcs_s(NULL, filename_w, MAX_PATH, filename, MAX_PATH - 1);
+
+  IMFSourceReader *src_reader;
+  if (FAILED(MFCreateSourceReaderFromURL(filename_w, NULL, &src_reader))) {
+    LOG("Failed to decode audio file (%s).", filename);
+    return NULL;
+  }
+
+  IMFMediaType *media_type = NULL;
+  VHR(IMFSourceReader_GetNativeMediaType(src_reader,
+    (DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, &media_type));
+
+  VHR(IMFMediaType_SetGUID(media_type, &MF_MT_MAJOR_TYPE, &MFMediaType_Audio));
+  VHR(IMFMediaType_SetGUID(media_type, &MF_MT_SUBTYPE, &MFAudioFormat_PCM));
+  VHR(IMFMediaType_SetUINT32(media_type, &MF_MT_AUDIO_NUM_CHANNELS,
+    g_optimal_fmt.nChannels));
+  VHR(IMFMediaType_SetUINT32(media_type, &MF_MT_AUDIO_SAMPLES_PER_SECOND,
+    g_optimal_fmt.nSamplesPerSec));
+}
+
 //
 // Pooled source voices (Psv) callback functions
 //
@@ -149,4 +173,26 @@ void aud_deinit_context(AudContext *aud)
   }
   if (aud->engine) MFShutdown();
   SAFE_RELEASE(aud->engine);
+}
+
+IXAudio2SourceVoice *find_idle_source_voice(AudContext *aud)
+{
+  assert(aud);
+  if (aud->engine == NULL) return NULL;
+
+  for (uint32_t i = 0; i < AUD_MAX_SOURCE_VOICES; ++i) {
+    XAUDIO2_VOICE_STATE state;
+    IXAudio2SourceVoice_GetState(aud->source_voices[i], &state,
+      XAUDIO2_VOICE_NOSAMPLESPLAYED);
+    if (state.BuffersQueued == 0) {
+      IXAudio2SourceVoice *voice = aud->source_voices[i];
+      IXAudio2SourceVoice_SetEffectChain(voice, NULL);
+      IXAudio2SourceVoice_SetSourceSampleRate(voice, g_optimal_fmt.
+        nSamplesPerSec);
+      IXAudio2SourceVoice_SetVolume(voice, 1.0f, XAUDIO2_COMMIT_NOW);
+      IXAudio2SourceVoice_SetFrequencyRatio(voice, 1.0f, XAUDIO2_COMMIT_NOW);
+      return voice;
+    }
+  }
+  return NULL;
 }

@@ -14,6 +14,8 @@
 #pragma warning(disable : 4668)
 #include <mfapi.h>
 #pragma warning(pop)
+#include <mfidl.h>
+#include <mfreadwrite.h>
 
 #include <stdio.h>
 #include <stdlib.h>
