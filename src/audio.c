@@ -175,7 +175,7 @@ void aud_deinit_context(AudContext *aud)
   SAFE_RELEASE(aud->engine);
 }
 
-IXAudio2SourceVoice *find_idle_source_voice(AudContext *aud)
+IXAudio2SourceVoice *aud_find_idle_source_voice(AudContext *aud)
 {
   assert(aud);
   if (aud->engine == NULL) return NULL;
