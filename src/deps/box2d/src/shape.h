@@ -36,7 +36,7 @@ typedef struct b2Shape
 		b2Circle circle;
 		b2Polygon polygon;
 		b2Segment segment;
-		b2SmoothSegment smoothSegment;
+		b2ChainSegment chainSegment;
 	};
 
 	uint16_t revision;
@@ -80,3 +80,6 @@ b2CastOutput b2RayCastShape( const b2RayCastInput* input, const b2Shape* shape, 
 b2CastOutput b2ShapeCastShape( const b2ShapeCastInput* input, const b2Shape* shape, b2Transform transform );
 
 b2Transform b2GetOwnerTransform( b2World* world, b2Shape* shape );
+
+B2_ARRAY_INLINE( b2ChainShape, b2ChainShape );
+B2_ARRAY_INLINE( b2Shape, b2Shape );

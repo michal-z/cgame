@@ -99,21 +99,33 @@ B2_API void b2World_CastPolygon( b2WorldId worldId, const b2Polygon* polygon, b2
 ///	@see b2WorldDef
 B2_API void b2World_EnableSleeping( b2WorldId worldId, bool flag );
 
+/// Is body sleeping enabled?
+B2_API bool b2World_IsSleepingEnabled( b2WorldId worldId );
+
 /// Enable/disable continuous collision between dynamic and static bodies. Generally you should keep continuous
 /// collision enabled to prevent fast moving objects from going through static objects. The performance gain from
 ///	disabling continuous collision is minor.
 ///	@see b2WorldDef
 B2_API void b2World_EnableContinuous( b2WorldId worldId, bool flag );
 
+/// Is continuous collision enabled?
+B2_API bool b2World_IsContinuousEnabled( b2WorldId worldId );
+
 /// Adjust the restitution threshold. It is recommended not to make this value very small
 ///	because it will prevent bodies from sleeping. Typically in meters per second.
 ///	@see b2WorldDef
 B2_API void b2World_SetRestitutionThreshold( b2WorldId worldId, float value );
 
+/// Get the the restitution speed threshold. Typically in meters per second.
+B2_API float b2World_GetRestitutionThreshold( b2WorldId worldId );
+
 /// Adjust the hit event threshold. This controls the collision velocity needed to generate a b2ContactHitEvent.
 /// Typically in meters per second.
 ///	@see b2WorldDef::hitEventThreshold
 B2_API void b2World_SetHitEventThreshold( b2WorldId worldId, float value );
+
+/// Get the the hit event speed threshold. Typically in meters per second.
+B2_API float b2World_GetHitEventThreshold( b2WorldId worldId );
 
 /// Register the custom filter callback. This is optional.
 B2_API void b2World_SetCustomFilterCallback( b2WorldId worldId, b2CustomFilterFcn* fcn, void* context );
@@ -147,6 +159,9 @@ B2_API void b2World_SetContactTuning( b2WorldId worldId, float hertz, float damp
 /// Enable/disable constraint warm starting. Advanced feature for testing. Disabling
 ///	sleeping greatly reduces stability and provides no performance gain.
 B2_API void b2World_EnableWarmStarting( b2WorldId worldId, bool flag );
+
+/// Is constraint warm starting enabled?
+B2_API bool b2World_IsWarmStartingEnabled( b2WorldId worldId );
 
 /// Get the current world performance profile
 B2_API b2Profile b2World_GetProfile( b2WorldId worldId );
@@ -384,6 +399,9 @@ B2_API bool b2Body_IsBullet( b2BodyId bodyId );
 ///	@see b2ShapeDef::enableHitEvents
 B2_API void b2Body_EnableHitEvents( b2BodyId bodyId, bool enableHitEvents );
 
+/// Get the world that owns this body
+B2_API b2WorldId b2Body_GetWorld( b2BodyId bodyId );
+
 /// Get the number of shapes on this body
 B2_API int b2Body_GetShapeCount( b2BodyId bodyId );
 
@@ -448,6 +466,9 @@ B2_API b2ShapeType b2Shape_GetType( b2ShapeId shapeId );
 
 /// Get the id of the body that a shape is attached to
 B2_API b2BodyId b2Shape_GetBody( b2ShapeId shapeId );
+
+/// Get the world that owns this shape
+B2_API b2WorldId b2Shape_GetWorld( b2ShapeId shapeId );
 
 /// Returns true If the shape is a sensor
 B2_API bool b2Shape_IsSensor( b2ShapeId shapeId );
@@ -521,7 +542,7 @@ B2_API bool b2Shape_AreHitEventsEnabled( b2ShapeId shapeId );
 B2_API bool b2Shape_TestPoint( b2ShapeId shapeId, b2Vec2 point );
 
 /// Ray cast a shape directly
-B2_API b2CastOutput b2Shape_RayCast( b2ShapeId shapeId, b2Vec2 origin, b2Vec2 translation );
+B2_API b2CastOutput b2Shape_RayCast( b2ShapeId shapeId, const b2RayCastInput* input );
 
 /// Get a copy of the shape's circle. Asserts the type is correct.
 B2_API b2Circle b2Shape_GetCircle( b2ShapeId shapeId );
@@ -529,9 +550,9 @@ B2_API b2Circle b2Shape_GetCircle( b2ShapeId shapeId );
 /// Get a copy of the shape's line segment. Asserts the type is correct.
 B2_API b2Segment b2Shape_GetSegment( b2ShapeId shapeId );
 
-/// Get a copy of the shape's smooth line segment. These come from chain shapes.
+/// Get a copy of the shape's chain segment. These come from chain shapes.
 /// Asserts the type is correct.
-B2_API b2SmoothSegment b2Shape_GetSmoothSegment( b2ShapeId shapeId );
+B2_API b2ChainSegment b2Shape_GetChainSegment( b2ShapeId shapeId );
 
 /// Get a copy of the shape's capsule. Asserts the type is correct.
 B2_API b2Capsule b2Shape_GetCapsule( b2ShapeId shapeId );
@@ -557,7 +578,7 @@ B2_API void b2Shape_SetSegment( b2ShapeId shapeId, const b2Segment* segment );
 ///	@see b2Body_ApplyMassFromShapes
 B2_API void b2Shape_SetPolygon( b2ShapeId shapeId, const b2Polygon* polygon );
 
-/// Get the parent chain id if the shape type is b2_smoothSegmentShape, otherwise
+/// Get the parent chain id if the shape type is a chain segment, otherwise
 /// returns b2_nullChainId.
 B2_API b2ChainId b2Shape_GetParentChain( b2ShapeId shapeId );
 
@@ -581,6 +602,16 @@ B2_API b2ChainId b2CreateChain( b2BodyId bodyId, const b2ChainDef* def );
 
 /// Destroy a chain shape
 B2_API void b2DestroyChain( b2ChainId chainId );
+
+/// Get the world that owns this chain shape
+B2_API b2WorldId b2Chain_GetWorld( b2ChainId chainId );
+
+/// Get the number of segments on this chain
+B2_API int b2Chain_GetSegmentCount( b2ChainId chainId );
+
+/// Fill a user array with chain segment shape ids up to the specified capacity. Returns
+///	the actual number of segments returned.
+B2_API int b2Chain_GetSegments( b2ChainId chainId, b2ShapeId* segmentArray, int capacity );
 
 /// Set the chain friction
 /// @see b2ChainDef::friction
@@ -615,6 +646,9 @@ B2_API b2BodyId b2Joint_GetBodyA( b2JointId jointId );
 
 /// Get body B id on a joint
 B2_API b2BodyId b2Joint_GetBodyB( b2JointId jointId );
+
+/// Get the world that owns this joint
+B2_API b2WorldId b2Joint_GetWorld( b2JointId jointId );
 
 /// Get the local anchor on bodyA
 B2_API b2Vec2 b2Joint_GetLocalAnchorA( b2JointId jointId );

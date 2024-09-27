@@ -9,6 +9,9 @@
 
 #define B2_NULL_INDEX ( -1 )
 
+// for performance comparisons
+#define B2_RESTRICT restrict
+
 #ifdef NDEBUG
 	#define B2_DEBUG 0
 #else
@@ -38,23 +41,23 @@
 #elif defined( __EMSCRIPTEN__ )
 	#define B2_PLATFORM_WASM
 #else
-	#error Unsupported platform
+	#define B2_PLATFORM_UNKNOWN
 #endif
 
 // Define CPU
-#if defined( __x86_64__ ) || defined( _M_X64 )
-	#define B2_CPU_X64
-#elif defined( __aarch64__ ) || defined( _M_ARM64 )
+#if defined( __x86_64__ ) || defined( _M_X64 ) || defined( __i386__ ) || defined( _M_IX86 )
+	#define B2_CPU_X86_X64
+#elif defined( __aarch64__ ) || defined( _M_ARM64 ) || defined( __arm__ ) || defined( _M_ARM )
 	#define B2_CPU_ARM
 #elif defined( __EMSCRIPTEN__ )
 	#define B2_CPU_WASM
 #else
-	#error Unsupported CPU
+	#define B2_CPU_UNKNOWN
 #endif
 
 // Define SIMD
 #if defined( BOX2D_ENABLE_SIMD )
-	#if defined( B2_CPU_X64 )
+	#if defined( B2_CPU_X86_X64 )
 		#if defined( BOX2D_AVX2 )
 			#define B2_SIMD_AVX2
 			#define B2_SIMD_WIDTH 8
@@ -65,7 +68,7 @@
 	#elif defined( B2_CPU_ARM )
 		#define B2_SIMD_NEON
 		#define B2_SIMD_WIDTH 4
-	#elif defined( __EMSCRIPTEN__ )
+	#elif defined( B2_CPU_WASM )
 		#define B2_CPU_WASM
 		#define B2_SIMD_SSE2
 		#define B2_SIMD_WIDTH 4
@@ -87,22 +90,15 @@
 	#define B2_COMPILER_MSVC
 #endif
 
+// see https://github.com/scottt/debugbreak
 #if defined( B2_COMPILER_MSVC )
 	#define B2_BREAKPOINT __debugbreak()
-#elif defined( B2_PLATFORM_WASM )
-	#define B2_BREAKPOINT                                                                                                            \
-		do                                                                                                                           \
-		{                                                                                                                            \
-		}                                                                                                                            \
-		while ( 0 )
 #elif defined( B2_COMPILER_GCC ) || defined( B2_COMPILER_CLANG )
-	#if defined( B2_CPU_X64 )
-		#define B2_BREAKPOINT __asm volatile( "int $0x3" )
-	#elif defined( B2_CPU_ARM )
-		#define B2_BREAKPOINT __builtin_trap()
-	#endif
+	#define B2_BREAKPOINT __builtin_trap()
 #else
-	#error Unknown platform
+	// Unknown compiler
+	#include <assert.h>
+	#definef B2_BREAKPOINT assert(0)
 #endif
 
 #if !defined( NDEBUG ) || defined( B2_ENABLE_ASSERT )
@@ -181,3 +177,7 @@ extern float b2_lengthUnitsPerMeter;
 #define B2_SECRET_COOKIE 1152023
 
 #define b2CheckDef( DEF ) B2_ASSERT( DEF->internalValue == B2_SECRET_COOKIE )
+
+void* b2Alloc( int size );
+void b2Free( void* mem, int size );
+void* b2GrowAlloc( void* oldMem, int oldSize, int newSize );

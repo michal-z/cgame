@@ -33,6 +33,14 @@ decode_audio_from_file(const char *filename)
     g_optimal_fmt.nChannels));
   VHR(IMFMediaType_SetUINT32(media_type, &MF_MT_AUDIO_SAMPLES_PER_SECOND,
     g_optimal_fmt.nSamplesPerSec));
+  VHR(IMFMediaType_SetUINT32(media_type, &MF_MT_AUDIO_BLOCK_ALIGNMENT,
+    g_optimal_fmt.nBlockAlign));
+  VHR(IMFMediaType_SetUINT32(media_type, &MF_MT_AUDIO_AVG_BYTES_PER_SECOND,
+    g_optimal_fmt.nBlockAlign * g_optimal_fmt.nSamplesPerSec));
+  VHR(IMFMediaType_SetUINT32(media_type, &MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE));
+
+  VHR(IMFSourceReader_SetCurrentMediaType(src_reader,
+    (DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, media_type));
 }
 
 //
