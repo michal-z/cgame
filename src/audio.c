@@ -96,7 +96,8 @@ static IXAudio2VoiceCallback g_psv_cb = {
   .lpVtbl = &g_psv_cb_vtbl,
 };
 
-void aud_init_context(AudContext *aud)
+void
+aud_init_context(AudContext *aud)
 {
   assert(aud && aud->engine == NULL);
 
@@ -157,7 +158,8 @@ void aud_init_context(AudContext *aud)
   LOG("[audio] Source voices created.");
 }
 
-void aud_deinit_context(AudContext *aud)
+void
+aud_deinit_context(AudContext *aud)
 {
   assert(aud);
   if (aud->engine) IXAudio2_StopEngine(aud->engine);
@@ -175,7 +177,8 @@ void aud_deinit_context(AudContext *aud)
   SAFE_RELEASE(aud->engine);
 }
 
-IXAudio2SourceVoice *aud_find_idle_source_voice(AudContext *aud)
+IXAudio2SourceVoice *
+aud_find_idle_source_voice(AudContext *aud)
 {
   assert(aud);
   if (aud->engine == NULL) return NULL;
