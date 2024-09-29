@@ -11,7 +11,7 @@ static const WAVEFORMATEX g_optimal_fmt = {
   .cbSize = sizeof(WAVEFORMATEX),
 };
 
-static uint8_t *
+static array_uint8_t
 decode_audio_from_file(const char *filename)
 {
   wchar_t filename_w[MAX_PATH];
@@ -20,7 +20,7 @@ decode_audio_from_file(const char *filename)
   IMFSourceReader *src_reader;
   if (FAILED(MFCreateSourceReaderFromURL(filename_w, NULL, &src_reader))) {
     LOG("Failed to decode audio file (%s).", filename);
-    return NULL;
+    return (array_uint8_t){0};
   }
 
   IMFMediaType *media_type = NULL;
@@ -41,6 +41,36 @@ decode_audio_from_file(const char *filename)
 
   VHR(IMFSourceReader_SetCurrentMediaType(src_reader,
     (DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, media_type));
+
+  array_uint8_t arr = {0};
+  arrsetcap(arr.items, 64 * 1024);
+
+  while (true) {
+    DWORD flags = 0;
+    IMFSample *sample = NULL;
+    VHR(IMFSourceReader_ReadSample(src_reader,
+      (DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &flags, NULL, &sample));
+
+    if (flags & MF_SOURCE_READERF_ENDOFSTREAM) {
+      assert(sample == NULL);
+      break;
+    }
+
+    IMFMediaBuffer *buffer = NULL;
+    VHR(IMFSample_ConvertToContiguousBuffer(sample, &buffer));
+
+    uint8_t *src = NULL;
+    DWORD src_len = 0;
+    VHR(IMFMediaBuffer_Lock(buffer, &src, NULL, &src_len));
+    uint8_t *dst = arraddnptr(arr.items, src_len);
+    memcpy(dst, src, src_len);
+    VHR(IMFMediaBuffer_Unlock(buffer));
+
+    SAFE_RELEASE(buffer);
+    SAFE_RELEASE(sample);
+  }
+
+  return arr;
 }
 
 //

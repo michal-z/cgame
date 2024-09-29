@@ -29,6 +29,18 @@
 
 #include "nuklear_with_config.h"
 #include "box2d/box2d.h"
+#include "stb/stb_ds.h"
+
+typedef struct array_uint8_t { uint8_t *items; } array_uint8_t;
+typedef struct array_uint16_t { uint16_t *items; } array_uint16_t;
+typedef struct array_uint32_t { uint32_t *items; } array_uint32_t;
+typedef struct array_uint64_t { uint64_t *items; } array_uint64_t;
+typedef struct array_int8_t { int8_t *items; } array_int8_t;
+typedef struct array_int16_t { int16_t *items; } array_int16_t;
+typedef struct array_int32_t { int32_t *items; } array_int32_t;
+typedef struct array_int64_t { int64_t *items; } array_int64_t;
+typedef struct array_float_t { float *items; } array_float_t;
+typedef struct array_double_t { double *items; } array_double_t;
 
 #define DX12_SDK_PATH ".\\d3d12\\"
 
