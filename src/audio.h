@@ -1,12 +1,15 @@
 #pragma once
 
-#define AUD_MAX_SOURCE_VOICES 32
+typedef struct AudSourceVoiceArray
+{
+  IXAudio2SourceVoice **items;
+} AudSourceVoiceArray;
 
 typedef struct AudContext
 {
   IXAudio2 *engine;
   IXAudio2MasteringVoice *mastering_voice;
-  IXAudio2SourceVoice *source_voices[AUD_MAX_SOURCE_VOICES];
+  AudSourceVoiceArray source_voices;
 } AudContext;
 
 void aud_init_context(AudContext *aud);

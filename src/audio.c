@@ -183,15 +183,16 @@ aud_init_context(AudContext *aud)
   }
   LOG("[audio] Mastering voice created.");
 
-  for (uint32_t i = 0; i < AUD_MAX_SOURCE_VOICES; ++i) {
-    if (FAILED(IXAudio2_CreateSourceVoice(aud->engine, &aud->source_voices[i],
-      &g_optimal_fmt, 0, XAUDIO2_DEFAULT_FREQ_RATIO,
-      &g_psv_cb, NULL, NULL)))
+  for (uint32_t i = 0; i < 32; ++i) {
+    IXAudio2SourceVoice *voice = NULL;
+    if (FAILED(IXAudio2_CreateSourceVoice(aud->engine, &voice, &g_optimal_fmt, 0,
+      XAUDIO2_DEFAULT_FREQ_RATIO, &g_psv_cb, NULL, NULL)))
     {
       LOG("[audio] Failed to create source voice. Continuing without sound.");
       aud_deinit_context(aud);
       return;
     }
+    arrpush(aud->source_voices.items, voice);
   }
   LOG("[audio] Source voices created.");
 }
@@ -201,12 +202,12 @@ aud_deinit_context(AudContext *aud)
 {
   assert(aud);
   if (aud->engine) IXAudio2_StopEngine(aud->engine);
-  for (uint32_t i = 0; i < AUD_MAX_SOURCE_VOICES; ++i) {
-    if (aud->source_voices[i]) {
-      IXAudio2SourceVoice_DestroyVoice(aud->source_voices[i]);
-      aud->source_voices[i] = NULL;
-    }
+  for (uint32_t i = 0; i < arrlenu(aud->source_voices.items); ++i) {
+    assert(aud->source_voices.items[i]);
+    IXAudio2SourceVoice_DestroyVoice(aud->source_voices.items[i]);
   }
+  arrfree(aud->source_voices.items);
+  aud->source_voices.items = NULL;
   if (aud->mastering_voice) {
     IXAudio2MasteringVoice_DestroyVoice(aud->mastering_voice);
     aud->mastering_voice = NULL;
@@ -221,19 +222,34 @@ aud_find_idle_source_voice(AudContext *aud)
   assert(aud);
   if (aud->engine == NULL) return NULL;
 
-  for (uint32_t i = 0; i < AUD_MAX_SOURCE_VOICES; ++i) {
+  IXAudio2SourceVoice *idle = NULL;
+
+  for (uint32_t i = 0; i < arrlenu(aud->source_voices.items); ++i) {
+    IXAudio2SourceVoice *voice = aud->source_voices.items[i];
     XAUDIO2_VOICE_STATE state;
-    IXAudio2SourceVoice_GetState(aud->source_voices[i], &state,
-      XAUDIO2_VOICE_NOSAMPLESPLAYED);
+    IXAudio2SourceVoice_GetState(voice, &state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
     if (state.BuffersQueued == 0) {
-      IXAudio2SourceVoice *voice = aud->source_voices[i];
-      IXAudio2SourceVoice_SetEffectChain(voice, NULL);
-      IXAudio2SourceVoice_SetSourceSampleRate(voice, g_optimal_fmt.
-        nSamplesPerSec);
-      IXAudio2SourceVoice_SetVolume(voice, 1.0f, XAUDIO2_COMMIT_NOW);
-      IXAudio2SourceVoice_SetFrequencyRatio(voice, 1.0f, XAUDIO2_COMMIT_NOW);
-      return voice;
+      idle = voice;
+      break;
     }
   }
-  return NULL;
+
+  if (idle == NULL) {
+    IXAudio2SourceVoice *voice = NULL;
+    if (FAILED(IXAudio2_CreateSourceVoice(aud->engine, &voice, &g_optimal_fmt, 0,
+      XAUDIO2_DEFAULT_FREQ_RATIO, &g_psv_cb, NULL, NULL)))
+    {
+      LOG("[audio] Failed to create additional source voice.");
+      return NULL;
+    }
+    arrpush(aud->source_voices.items, voice);
+    idle = voice;
+  }
+  assert(idle);
+
+  IXAudio2SourceVoice_SetEffectChain(idle, NULL);
+  IXAudio2SourceVoice_SetSourceSampleRate(idle, g_optimal_fmt. nSamplesPerSec);
+  IXAudio2SourceVoice_SetVolume(idle, 1.0f, XAUDIO2_COMMIT_NOW);
+  IXAudio2SourceVoice_SetFrequencyRatio(idle, 1.0f, XAUDIO2_COMMIT_NOW);
+  return idle;
 }
