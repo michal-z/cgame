@@ -1,6 +1,19 @@
 #include "pch.h"
 #include "audio.h"
 
+#define MAX_SOUNDS 1024
+
+typedef struct Sound
+{
+  array_uint8_t samples;
+} Sound;
+
+typedef struct SoundPool
+{
+  Sound sounds[MAX_SOUNDS];
+  uint16_t generations[MAX_SOUNDS];
+} SoundPool;
+
 static const WAVEFORMATEX g_optimal_fmt = {
   .wFormatTag = WAVE_FORMAT_PCM,
   .nChannels = 1,

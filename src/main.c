@@ -507,14 +507,14 @@ game_init(GameState *game_state)
       .InputLayout = {
         .NumElements = 3,
         .pInputElementDescs = (D3D12_INPUT_ELEMENT_DESC[]){
-          { "_Pos", 0, DXGI_FORMAT_R32G32_FLOAT, 0, NK_OFFSETOF(GuiVertex, pos),
+          { "_Pos", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(GuiVertex, pos),
             D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
           },
-          { "_Uv", 0, DXGI_FORMAT_R32G32_FLOAT, 0, NK_OFFSETOF(GuiVertex, uv),
+          { "_Uv", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(GuiVertex, uv),
             D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
           },
           { "_Color", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0,
-            NK_OFFSETOF(GuiVertex, col),
+            offsetof(GuiVertex, col),
             D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
           },
         },

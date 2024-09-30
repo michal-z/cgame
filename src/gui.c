@@ -183,9 +183,9 @@ gui_draw(GuiContext *gui, GpuContext *gpu, ID3D12PipelineState *pso,
   nk_convert(&gui->nkctx, &gui->cmds, &vbuf, &ibuf,
     &(struct nk_convert_config){
       .vertex_layout = (struct nk_draw_vertex_layout_element[]){
-        { NK_VERTEX_POSITION, NK_FORMAT_FLOAT, NK_OFFSETOF(GuiVertex, pos) },
-        { NK_VERTEX_TEXCOORD, NK_FORMAT_FLOAT, NK_OFFSETOF(GuiVertex, uv) },
-        { NK_VERTEX_COLOR, NK_FORMAT_R8G8B8A8, NK_OFFSETOF(GuiVertex, col) },
+        { NK_VERTEX_POSITION, NK_FORMAT_FLOAT, offsetof(GuiVertex, pos) },
+        { NK_VERTEX_TEXCOORD, NK_FORMAT_FLOAT, offsetof(GuiVertex, uv) },
+        { NK_VERTEX_COLOR, NK_FORMAT_R8G8B8A8, offsetof(GuiVertex, col) },
         { NK_VERTEX_LAYOUT_END },
       },
       .vertex_size = sizeof(GuiVertex),
