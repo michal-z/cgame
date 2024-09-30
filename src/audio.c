@@ -216,7 +216,10 @@ void
 aud_deinit_context(AudContext *aud)
 {
   assert(aud);
-  M_FREE(aud->sound_pool);
+  if (aud->sound_pool) {
+    M_FREE(aud->sound_pool);
+    aud->sound_pool = NULL;
+  }
   if (aud->engine) IXAudio2_StopEngine(aud->engine);
   for (uint32_t i = 0; i < arrlenu(aud->source_voices.items); ++i) {
     assert(aud->source_voices.items[i]);

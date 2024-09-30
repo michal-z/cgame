@@ -1,6 +1,5 @@
 #pragma once
 
-typedef struct AudSoundPool AudSoundPool;
 typedef struct AudSound
 {
   alignas(4) uint16_t index;
@@ -19,7 +18,7 @@ typedef struct AudContext
   IXAudio2 *engine;
   IXAudio2MasteringVoice *mastering_voice;
   AudSourceVoiceArray source_voices;
-  AudSoundPool *sound_pool;
+  struct SoundPool *sound_pool;
 } AudContext;
 
 void aud_init_context(AudContext *aud);
