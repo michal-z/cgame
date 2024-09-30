@@ -184,7 +184,7 @@ aud_init_context(AudContext *aud)
     aud_deinit_context(aud);
     return;
   }
-  LOG("[audio] Windows Media Foundation is ready.");
+  LOG("[audio] Windows Media Foundation is ready");
 
   if (FAILED(IXAudio2_CreateMasteringVoice(aud->engine, &aud->mastering_voice,
     XAUDIO2_DEFAULT_CHANNELS, XAUDIO2_DEFAULT_SAMPLERATE, 0, NULL, NULL,
@@ -194,7 +194,7 @@ aud_init_context(AudContext *aud)
     aud_deinit_context(aud);
     return;
   }
-  LOG("[audio] Mastering voice created.");
+  LOG("[audio] Mastering voice created");
 
   for (uint32_t i = 0; i < 32; ++i) {
     IXAudio2SourceVoice *voice = NULL;
@@ -207,7 +207,7 @@ aud_init_context(AudContext *aud)
     }
     arrpush(aud->source_voices.items, voice);
   }
-  LOG("[audio] Source voices created.");
+  LOG("[audio] Source voices created");
 
   aud->sound_pool = M_ALLOC(sizeof(SoundPool));
   memset(aud->sound_pool, 0, sizeof(SoundPool));
