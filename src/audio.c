@@ -5,7 +5,7 @@
 
 typedef struct Sound
 {
-  array_uint8_t samples;
+  array_uint8_t bytes;
 } Sound;
 
 typedef struct SoundPool
@@ -208,12 +208,15 @@ aud_init_context(AudContext *aud)
     arrpush(aud->source_voices.items, voice);
   }
   LOG("[audio] Source voices created.");
+
+  aud->sound_pool = M_ALLOC(sizeof(SoundPool));
 }
 
 void
 aud_deinit_context(AudContext *aud)
 {
   assert(aud);
+  M_FREE(aud->sound_pool);
   if (aud->engine) IXAudio2_StopEngine(aud->engine);
   for (uint32_t i = 0; i < arrlenu(aud->source_voices.items); ++i) {
     assert(aud->source_voices.items[i]);
