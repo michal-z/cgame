@@ -210,6 +210,7 @@ aud_init_context(AudContext *aud)
   LOG("[audio] Source voices created.");
 
   aud->sound_pool = M_ALLOC(sizeof(SoundPool));
+  memset(aud->sound_pool, 0, sizeof(SoundPool));
 }
 
 void
@@ -217,6 +218,13 @@ aud_deinit_context(AudContext *aud)
 {
   assert(aud);
   if (aud->sound_pool) {
+    for (uint32_t i = 0; i < MAX_SOUNDS; ++i) {
+      Sound *snd = &aud->sound_pool->sounds[i];
+      if (snd->bytes.items) {
+        arrfree(snd->bytes.items);
+        snd->bytes.items = NULL;
+      }
+    }
     M_FREE(aud->sound_pool);
     aud->sound_pool = NULL;
   }
