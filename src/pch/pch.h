@@ -31,6 +31,7 @@
 #include "nuklear_with_config.h"
 #include "box2d/box2d.h"
 #include "stb/stb_ds.h"
+#include "TaskScheduler_c.h"
 
 typedef struct array_uint8_t { uint8_t *items; } array_uint8_t;
 typedef struct array_uint16_t { uint16_t *items; } array_uint16_t;
