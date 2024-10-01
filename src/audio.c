@@ -331,6 +331,7 @@ aud_play_sound(AudContext *aud, AudSound sound, AudPlaySoundArgs *args)
         .pContext = voice,
       },
       NULL));
+    VHR(IXAudio2SourceVoice_Start(voice, 0, XAUDIO2_COMMIT_NOW));
   }
 }
 

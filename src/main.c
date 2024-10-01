@@ -44,6 +44,8 @@ typedef struct GameState
   uint32_t object_textures_num;
   struct nk_font *fonts[FONT_MAX];
 
+  AudSound sounds[2];
+
   Mesh meshes[MESH_MAX];
   uint32_t meshes_num;
 
@@ -420,6 +422,7 @@ game_init(GameState *game_state)
       .num_msaa_samples = NUM_MSAA_SAMPLES,
     });
 
+  AudContext *aud = &game_state->audio_context;
   GpuContext *gpu = &game_state->gpu_context;
   GuiContext *gui = &game_state->gui_context;
 
@@ -429,6 +432,11 @@ game_init(GameState *game_state)
   gui_init_end(gui, gpu);
 
   nk_style_set_font(&gui->nkctx, &game_state->fonts[FONT_NORMAL]->handle);
+
+  game_state->sounds[0] = aud_create_sound_from_file(aud,
+    "assets/sounds/drum_bass_hard.flac");
+  game_state->sounds[1] = aud_create_sound_from_file(aud,
+    "assets/sounds/tabla_tas1.flac");
 
   //
   // PSO_FIRST
@@ -1016,6 +1024,9 @@ game_update(GameState *game_state)
         game_state->phy.total_profile = (b2Profile){0};
         game_state->phy.max_profile = (b2Profile){0};
         game_state->phy.num_steps = 0;
+
+        aud_play_sound(&game_state->audio_context,
+          game_state->sounds[rand() % 2], NULL);
       }
 
       nk_tree_pop(nkctx);
