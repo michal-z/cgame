@@ -228,6 +228,7 @@ void
 aud_deinit_context(AudContext *aud)
 {
   assert(aud);
+  if (aud->engine) IXAudio2_StopEngine(aud->engine);
   if (aud->sound_pool) {
     for (uint32_t i = 0; i <= MAX_SOUNDS; ++i) {
       Sound *snd = &aud->sound_pool->sounds[i];
@@ -239,13 +240,14 @@ aud_deinit_context(AudContext *aud)
     M_FREE(aud->sound_pool);
     aud->sound_pool = NULL;
   }
-  if (aud->engine) IXAudio2_StopEngine(aud->engine);
   for (uint32_t i = 0; i < arrlenu(aud->source_voices.items); ++i) {
     assert(aud->source_voices.items[i]);
     IXAudio2SourceVoice_DestroyVoice(aud->source_voices.items[i]);
   }
-  arrfree(aud->source_voices.items);
-  aud->source_voices.items = NULL;
+  if (aud->source_voices.items) {
+    arrfree(aud->source_voices.items);
+    aud->source_voices.items = NULL;
+  }
   if (aud->mastering_voice) {
     IXAudio2MasteringVoice_DestroyVoice(aud->mastering_voice);
     aud->mastering_voice = NULL;
