@@ -10,8 +10,8 @@ typedef struct Sound
 
 typedef struct SoundPool
 {
-  Sound sounds[MAX_SOUNDS];
-  uint16_t generations[MAX_SOUNDS];
+  Sound sounds[MAX_SOUNDS + 1];
+  uint16_t generations[MAX_SOUNDS + 1];
 } SoundPool;
 
 static const WAVEFORMATEX g_optimal_fmt = {
@@ -62,7 +62,8 @@ decode_audio_from_file(const char *filename)
     DWORD flags = 0;
     IMFSample *sample = NULL;
     VHR(IMFSourceReader_ReadSample(src_reader,
-      (DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &flags, NULL, &sample));
+      (DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &flags, NULL,
+      &sample));
 
     if (flags & MF_SOURCE_READERF_ENDOFSTREAM) {
       assert(sample == NULL);
@@ -84,6 +85,16 @@ decode_audio_from_file(const char *filename)
   }
 
   return arr;
+}
+
+static Sound *
+find_sound_ptr(AudContext *aud, AudSound sound)
+{
+  assert(aud);
+  if (aud_is_sound_valid(aud, sound)) {
+    return &aud->sound_pool->sounds[sound.index];
+  }
+  return NULL;
 }
 
 //
@@ -218,7 +229,7 @@ aud_deinit_context(AudContext *aud)
 {
   assert(aud);
   if (aud->sound_pool) {
-    for (uint32_t i = 0; i < MAX_SOUNDS; ++i) {
+    for (uint32_t i = 0; i <= MAX_SOUNDS; ++i) {
       Sound *snd = &aud->sound_pool->sounds[i];
       if (snd->bytes.items) {
         arrfree(snd->bytes.items);
@@ -241,6 +252,86 @@ aud_deinit_context(AudContext *aud)
   }
   if (aud->engine) MFShutdown();
   SAFE_RELEASE(aud->engine);
+}
+
+AudSound
+aud_create_sound_from_file(AudContext *aud, const char *filename)
+{
+  assert(aud && filename);
+  if (aud->engine) {
+    uint32_t slot_idx = 1;
+    while (slot_idx <= MAX_SOUNDS) {
+      if (aud->sound_pool->sounds[slot_idx].bytes.items == NULL)
+        break;
+      slot_idx += 1;
+    }
+    if (slot_idx > MAX_SOUNDS) {
+      LOG("[audio] Failed to create sound (pool is full)");
+      return (AudSound){0};
+    }
+    array_uint8_t audio_data = decode_audio_from_file(filename);
+    if (audio_data.items == NULL) {
+      LOG("[audio] Failed to create sound");
+      return (AudSound){0};
+    }
+
+    aud->sound_pool->sounds[slot_idx].bytes = audio_data;
+    aud->sound_pool->generations[slot_idx] += 1;
+    return (AudSound){
+      .index = (uint16_t)slot_idx,
+      .generation = aud->sound_pool->generations[slot_idx],
+    };
+  }
+  return (AudSound){0};
+}
+
+void
+aud_destroy_sound(AudContext *aud, AudSound sound)
+{
+  assert(aud);
+  Sound *sound_ptr = find_sound_ptr(aud, sound);
+  if (sound_ptr) {
+    assert(sound_ptr->bytes.items);
+    arrfree(sound_ptr->bytes.items);
+    *sound_ptr = (Sound){0};
+  }
+}
+
+bool
+aud_is_sound_valid(AudContext *aud, AudSound sound)
+{
+  return sound.index > 0 &&
+    sound.index <= MAX_SOUNDS &&
+    sound.generation > 0 &&
+    sound.generation == aud->sound_pool->generations[sound.index] &&
+    aud->sound_pool->sounds[sound.index].bytes.items != NULL;
+}
+
+void
+aud_play_sound(AudContext *aud, AudSound sound, AudPlaySoundArgs *args)
+{
+  assert(aud);
+  if (aud->engine == NULL) return;
+
+  Sound *sound_ptr = find_sound_ptr(aud, sound);
+  if (sound_ptr) {
+    IXAudio2SourceVoice *voice = aud_find_idle_source_voice(aud);
+    assert(voice);
+
+    VHR(IXAudio2SourceVoice_SubmitSourceBuffer(voice,
+      &(XAUDIO2_BUFFER){
+        .Flags = XAUDIO2_END_OF_STREAM,
+        .AudioBytes = (uint32_t)arrlenu(sound_ptr->bytes.items),
+        .pAudioData = sound_ptr->bytes.items,
+        .PlayBegin = args ? args->play_begin : 0,
+        .PlayLength = args ? args->play_length : 0,
+        .LoopBegin = args ? args->loop_begin : 0,
+        .LoopLength = args ? args->loop_length : 0,
+        .LoopCount = args ? args->loop_count : 0,
+        .pContext = voice,
+      },
+      NULL));
+  }
 }
 
 IXAudio2SourceVoice *

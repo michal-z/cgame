@@ -149,3 +149,7 @@ void mem_free(void *ptr, const char *file, int32_t line);
 #undef ID3D12Device14_CreateComputePipelineState
 #define ID3D12Device14_CreateComputePipelineState(This,...)	\
   ( (This)->lpVtbl -> CreateComputePipelineState(This,__VA_ARGS__) )
+
+#undef IXAudio2SourceVoice_SubmitSourceBuffer
+#define IXAudio2SourceVoice_SubmitSourceBuffer(This,...)	\
+  ( (This)->lpVtbl -> SubmitSourceBuffer(This,__VA_ARGS__) )
