@@ -243,6 +243,7 @@ aud_deinit_context(AudContext *aud)
   for (uint32_t i = 0; i < arrlenu(aud->source_voices.items); ++i) {
     assert(aud->source_voices.items[i]);
     IXAudio2SourceVoice_DestroyVoice(aud->source_voices.items[i]);
+    aud->source_voices.items[i] = NULL;
   }
   if (aud->source_voices.items) {
     arrfree(aud->source_voices.items);
