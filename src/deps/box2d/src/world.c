@@ -179,6 +179,8 @@ b2WorldId b2CreateWorld( const b2WorldDef* def )
 	world->contactDampingRatio = def->contactDampingRatio;
 	world->jointHertz = def->jointHertz;
 	world->jointDampingRatio = def->jointDampingRatio;
+	world->frictionMixingRule = def->frictionMixingRule;
+	world->restitutionMixingRule = def->restitutionMixingRule;
 	world->enableSleep = def->enableSleep;
 	world->locked = false;
 	world->enableWarmStarting = true;
@@ -587,7 +589,7 @@ static void b2Collide( b2StepContext* context )
 					// Contact is solid
 					if ( flags & b2_contactEnableContactEvents )
 					{
-						b2ContactBeginTouchEvent event = { shapeIdA, shapeIdB };
+						b2ContactBeginTouchEvent event = { shapeIdA, shapeIdB, contactSim->manifold };
 						b2ContactBeginTouchEventArray_Push( &world->contactBeginEvents, event );
 					}
 
@@ -1670,7 +1672,7 @@ float b2World_GetHitEventThreshold( b2WorldId worldId )
 	return world->hitEventThreshold;
 }
 
-void b2World_SetContactTuning( b2WorldId worldId, float hertz, float dampingRatio, float pushOut )
+void b2World_SetContactTuning( b2WorldId worldId, float hertz, float dampingRatio, float pushVelocity )
 {
 	b2World* world = b2GetWorldFromId( worldId );
 	B2_ASSERT( world->locked == false );
@@ -1681,7 +1683,40 @@ void b2World_SetContactTuning( b2WorldId worldId, float hertz, float dampingRati
 
 	world->contactHertz = b2ClampFloat( hertz, 0.0f, FLT_MAX );
 	world->contactDampingRatio = b2ClampFloat( dampingRatio, 0.0f, FLT_MAX );
-	world->contactPushoutVelocity = b2ClampFloat( pushOut, 0.0f, FLT_MAX );
+	world->contactPushoutVelocity = b2ClampFloat( pushVelocity, 0.0f, FLT_MAX );
+}
+
+void b2World_SetJointTuning(b2WorldId worldId, float hertz, float dampingRatio)
+{
+	b2World* world = b2GetWorldFromId( worldId );
+	B2_ASSERT( world->locked == false );
+	if ( world->locked )
+	{
+		return;
+	}
+
+	world->jointHertz = b2ClampFloat( hertz, 0.0f, FLT_MAX );
+	world->jointDampingRatio = b2ClampFloat( dampingRatio, 0.0f, FLT_MAX );
+}
+
+void b2World_SetMaximumLinearVelocity(b2WorldId worldId, float maximumLinearVelocity)
+{
+	B2_ASSERT( b2IsValid( maximumLinearVelocity ) && maximumLinearVelocity > 0.0f );
+
+	b2World* world = b2GetWorldFromId( worldId );
+	B2_ASSERT( world->locked == false );
+	if ( world->locked )
+	{
+		return;
+	}
+
+	world->maxLinearVelocity = maximumLinearVelocity;
+}
+
+float b2World_GetMaximumLinearVelocity(b2WorldId worldId)
+{
+	b2World* world = b2GetWorldFromId( worldId );
+	return world->maxLinearVelocity;
 }
 
 b2Profile b2World_GetProfile( b2WorldId worldId )
@@ -2368,7 +2403,8 @@ struct ExplosionContext
 	b2World* world;
 	b2Vec2 position;
 	float radius;
-	float magnitude;
+	float falloff;
+	float impulsePerLength;
 };
 
 static bool ExplosionCallback( int proxyId, int shapeId, void* context )
@@ -2381,17 +2417,7 @@ static bool ExplosionCallback( int proxyId, int shapeId, void* context )
 	b2Shape* shape = b2ShapeArray_Get( &world->shapes, shapeId );
 
 	b2Body* body = b2BodyArray_Get( &world->bodies, shape->bodyId );
-	if ( body->type == b2_kinematicBody )
-	{
-		return true;
-	}
-
-	b2WakeBody( world, body );
-
-	if ( body->setIndex != b2_awakeSet )
-	{
-		return true;
-	}
+	B2_ASSERT( body->type == b2_dynamicBody );
 
 	b2Transform transform = b2GetBodyTransformQuick( world, body );
 
@@ -2405,24 +2431,46 @@ static bool ExplosionCallback( int proxyId, int shapeId, void* context )
 	b2DistanceCache cache = { 0 };
 	b2DistanceOutput output = b2ShapeDistance( &cache, &input, NULL, 0 );
 
-	if ( output.distance > explosionContext->radius )
+	float radius = explosionContext->radius;
+	float falloff = explosionContext->falloff;
+	if ( output.distance > radius + falloff )
+	{
+		return true;
+	}
+
+	b2WakeBody( world, body );
+
+	if ( body->setIndex != b2_awakeSet )
 	{
 		return true;
 	}
 
 	b2Vec2 closestPoint = output.pointA;
-
 	if ( output.distance == 0.0f )
 	{
 		b2Vec2 localCentroid = b2GetShapeCentroid( shape );
 		closestPoint = b2TransformPoint( transform, localCentroid );
 	}
 
-	float falloff = 0.4f;
-	float perimeter = b2GetShapePerimeter( shape );
-	float magnitude = explosionContext->magnitude * perimeter * ( 1.0f - falloff * output.distance / explosionContext->radius );
+	b2Vec2 direction = b2Sub( closestPoint, explosionContext->position );
+	if (b2LengthSquared(direction) > 100.0f * FLT_EPSILON * FLT_EPSILON)
+	{
+		direction = b2Normalize( direction );
+	}
+	else
+	{
+		direction = ( b2Vec2 ){ 1.0f, 0.0f };
+	}
 
-	b2Vec2 direction = b2Normalize( b2Sub( closestPoint, explosionContext->position ) );
+	b2Vec2 localLine = b2InvRotateVector( transform.q, b2LeftPerp(direction) );
+	float perimeter = b2GetShapeProjectedPerimeter( shape, localLine );
+	float scale = 1.0f;
+	if ( output.distance > radius && falloff > 0.0f )
+	{
+		scale = b2ClampFloat((radius + falloff - output.distance) / falloff, 0.0f, 1.0f);
+	}
+
+	float magnitude = explosionContext->impulsePerLength * perimeter * scale;
 	b2Vec2 impulse = b2MulSV( magnitude, direction );
 
 	int localIndex = body->localIndex;
@@ -2435,11 +2483,18 @@ static bool ExplosionCallback( int proxyId, int shapeId, void* context )
 	return true;
 }
 
-void b2World_Explode( b2WorldId worldId, b2Vec2 position, float radius, float magnitude )
+void b2World_Explode( b2WorldId worldId, const b2ExplosionDef* explosionDef )
 {
+	uint64_t maskBits = explosionDef->maskBits;
+	b2Vec2 position = explosionDef->position;
+	float radius = explosionDef->radius;
+	float falloff = explosionDef->falloff;
+	float impulsePerLength = explosionDef->impulsePerLength;
+
 	B2_ASSERT( b2Vec2_IsValid( position ) );
-	B2_ASSERT( b2IsValid( radius ) && radius > 0.0f );
-	B2_ASSERT( b2IsValid( magnitude ) );
+	B2_ASSERT( b2IsValid( radius ) && radius >= 0.0f );
+	B2_ASSERT( b2IsValid( falloff ) && falloff >= 0.0f );
+	B2_ASSERT( b2IsValid( impulsePerLength ) );
 
 	b2World* world = b2GetWorldFromId( worldId );
 	B2_ASSERT( world->locked == false );
@@ -2448,15 +2503,16 @@ void b2World_Explode( b2WorldId worldId, b2Vec2 position, float radius, float ma
 		return;
 	}
 
-	struct ExplosionContext explosionContext = { world, position, radius, magnitude };
+	struct ExplosionContext explosionContext = { world, position, radius, falloff,
+												 impulsePerLength };
 
 	b2AABB aabb;
-	aabb.lowerBound.x = position.x - radius;
-	aabb.lowerBound.y = position.y - radius;
-	aabb.upperBound.x = position.x + radius;
-	aabb.upperBound.y = position.y + radius;
+	aabb.lowerBound.x = position.x - (radius + falloff);
+	aabb.lowerBound.y = position.y - (radius + falloff);
+	aabb.upperBound.x = position.x + (radius + falloff);
+	aabb.upperBound.y = position.y + (radius + falloff);
 
-	b2DynamicTree_Query( world->broadPhase.trees + b2_dynamicBody, aabb, b2_defaultMaskBits, ExplosionCallback,
+	b2DynamicTree_Query( world->broadPhase.trees + b2_dynamicBody, aabb, maskBits, ExplosionCallback,
 						 &explosionContext );
 }
 
