@@ -107,6 +107,18 @@ IF NOT EXIST box2d.lib (
 ) & if ERRORLEVEL 1 GOTO error
 
 ::
+:: enkiTS
+::
+IF NOT EXIST enkits.lib (
+  %CC% %C_FLAGS% /Fd:"enkits.pdb" /EHsc /W3 /wd4946 ^
+  /c "src\deps\enkits\TaskScheduler.cpp" "src\deps\enkits\TaskScheduler_c.cpp"
+
+  lib %LIB_FLAGS% "*.obj" /OUT:"enkits.lib"
+
+  IF EXIST "*.obj" DEL "*.obj"
+) & if ERRORLEVEL 1 GOTO error
+
+::
 :: Precompiled header
 ::
 IF NOT EXIST pch.lib (
