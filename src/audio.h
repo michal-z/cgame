@@ -6,7 +6,7 @@ typedef struct AudSound
   uint16_t generation;
 } AudSound;
 
-static_assert(alignof(AudSound) == 4);
+static_assert(sizeof(AudSound) == 4 && alignof(AudSound) == 4);
 
 typedef struct AudSourceVoiceArray
 {
