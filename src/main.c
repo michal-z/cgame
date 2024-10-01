@@ -1024,12 +1024,13 @@ game_update(GameState *game_state)
         game_state->phy.total_profile = (b2Profile){0};
         game_state->phy.max_profile = (b2Profile){0};
         game_state->phy.num_steps = 0;
-
-        aud_play_sound(&game_state->audio_context,
-          game_state->sounds[rand() % 2], NULL);
       }
-
       nk_tree_pop(nkctx);
+    }
+
+    if (nk_button_label(nkctx, "Play test sound")) {
+      aud_play_sound(&game_state->audio_context,
+        game_state->sounds[rand() % 2], NULL);
     }
   }
   nk_end(nkctx);
