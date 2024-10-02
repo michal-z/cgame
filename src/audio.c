@@ -56,7 +56,7 @@ decode_audio_from_file(const char *filename)
     (DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, media_type));
 
   array_uint8_t arr = {0};
-  arrsetcap(arr.items, 64 * 1024);
+  arrsetcap(arr.items, 32 * 1024);
 
   while (true) {
     DWORD flags = 0;
@@ -83,6 +83,9 @@ decode_audio_from_file(const char *filename)
     SAFE_RELEASE(buffer);
     SAFE_RELEASE(sample);
   }
+
+  LOG("[audio] Decoded sound %s it takes %d bytes", filename,
+    (int32_t)arrlen(arr.items));
 
   return arr;
 }
