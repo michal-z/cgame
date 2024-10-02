@@ -24,6 +24,12 @@
 
 #define WORLD_SIZE_Y 12.0f
 
+typedef struct Mesh
+{
+  uint32_t first_vertex;
+  uint32_t num_vertices;
+} Mesh;
+
 typedef struct PhyTask
 {
   enkiTaskSet *task_set;
@@ -31,11 +37,18 @@ typedef struct PhyTask
   void *cb_context;
 } PhyTask;
 
-typedef struct Mesh
+typedef struct PhyState
 {
-  uint32_t first_vertex;
-  uint32_t num_vertices;
-} Mesh;
+  b2WorldId world;
+  b2Profile max_profile;
+  b2Profile total_profile;
+  int32_t num_steps;
+  b2JointId mouse_joint;
+  b2BodyId mouse_fixed_body;
+  enkiTaskScheduler *scheduler;
+  PhyTask tasks[64];
+  int32_t num_tasks;
+} PhyState;
 
 typedef struct GameState
 {
@@ -59,17 +72,7 @@ typedef struct GameState
   CgObject objects[OBJ_MAX];
   uint32_t objects_num;
 
-  struct {
-    b2WorldId world;
-    b2Profile max_profile;
-    b2Profile total_profile;
-    int32_t num_steps;
-    b2JointId mouse_joint;
-    b2BodyId mouse_fixed_body;
-    enkiTaskScheduler *scheduler;
-    PhyTask tasks[64];
-    int32_t num_tasks;
-  } phy;
+  PhyState phy;
 } GameState;
 
 static_assert(sizeof(GameState) <= 128 * 1024);
@@ -147,14 +150,13 @@ static void *
 phy_enqueue_task(b2TaskCallback *cb, int32_t item_count, int32_t min_range,
   void *cb_context, void *user_context)
 {
-  GameState *game_state = (GameState *)user_context;
-  if (game_state->phy.num_tasks < _countof(game_state->phy.tasks)) {
-    PhyTask *task = &game_state->phy.tasks[game_state->phy.num_tasks];
+  PhyState *phy = (PhyState *)user_context;
+  if (phy->num_tasks < _countof(phy->tasks)) {
+    PhyTask *task = &phy->tasks[phy->num_tasks++];
     task->cb = cb;
     task->cb_context = cb_context;
-    enkiAddTaskSetMinRange(game_state->phy.scheduler, task->task_set, task,
+    enkiAddTaskSetMinRange(phy->scheduler, task->task_set, task,
       item_count, min_range);
-    game_state->phy.num_tasks += 1;
     return task;
   } else {
     assert(false && "increase size of GameState.phy.tasks array");
@@ -168,8 +170,8 @@ phy_finish_task(void *task_ptr, void *user_context)
 {
   if (task_ptr != NULL) {
     PhyTask *task = (PhyTask *)task_ptr;
-    GameState *game_state = (GameState *)user_context;
-    enkiWaitForTaskSet(game_state->phy.scheduler, task->task_set);
+    PhyState *phy = (PhyState *)user_context;
+    enkiWaitForTaskSet(phy->scheduler, task->task_set);
   }
 }
 
@@ -323,7 +325,7 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
       float my = (float)GET_Y_LPARAM(lparam);
 
       b2Vec2 p = screen_to_world_coords(mx, my, w, h);
-      b2Vec2 d = { 0.5f, 0.5f };
+      b2Vec2 d = { 0.25f, 0.25f };
       b2AABB box = { b2Sub(p, d), b2Add(p, d) };
 
       MouseQueryContext query_context = { p, b2_nullBodyId };
@@ -752,18 +754,20 @@ game_init(GameState *game_state)
   gpu_flush_command_lists(gpu);
   gpu_wait_for_completion(gpu);
 
-  game_state->phy.scheduler = enkiNewTaskScheduler();
+  PhyState *phy = &game_state->phy;
+
+  phy->scheduler = enkiNewTaskScheduler();
   {
     SYSTEM_INFO info;
     GetSystemInfo(&info);
     // TODO: Get number of physical, performance cores.
-    enkiInitTaskSchedulerNumThreads(game_state->phy.scheduler,
+    enkiInitTaskSchedulerNumThreads(phy->scheduler,
       info.dwNumberOfProcessors / 2);
   }
 
-  for (uint32_t i = 0; i < _countof(game_state->phy.tasks); ++i) {
-    game_state->phy.tasks[i].task_set =
-      enkiCreateTaskSet(game_state->phy.scheduler, phy_task_execute_range);
+  for (uint32_t i = 0; i < _countof(phy->tasks); ++i) {
+    phy->tasks[i].task_set = enkiCreateTaskSet(phy->scheduler,
+      phy_task_execute_range);
   }
 
   //
@@ -771,13 +775,13 @@ game_init(GameState *game_state)
   //
   {
     b2WorldDef world_def = b2DefaultWorldDef();
-    world_def.workerCount = enkiGetNumTaskThreads(game_state->phy.scheduler);
+    world_def.workerCount = enkiGetNumTaskThreads(phy->scheduler);
     world_def.enqueueTask = phy_enqueue_task;
     world_def.finishTask = phy_finish_task;
-    world_def.userTaskContext = game_state;
-    game_state->phy.world = b2CreateWorld(&world_def);
+    world_def.userTaskContext = phy;
+    world_def.enableSleep = true;
+    phy->world = b2CreateWorld(&world_def);
   }
-  b2WorldId phy_world = game_state->phy.world;
 
   g_box1m = b2MakeBox(0.5f, 0.5f);
   g_box1m_def = b2DefaultShapeDef();
@@ -790,7 +794,7 @@ game_init(GameState *game_state)
     body_def.position = (b2Vec2){ 0.0f, 0.0f };
     body_def.rotation = (b2Rot){ cosf(0.0f), sinf(0.0f) };
     body_def.userData = object;
-    b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+    b2BodyId body_id = b2CreateBody(phy->world, &body_def);
     b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
 
     *object = (CgObject){
@@ -807,7 +811,7 @@ game_init(GameState *game_state)
     body_def.position = (b2Vec2){ 0.25f, 6.0f };
     body_def.rotation = (b2Rot){ cosf(0.5f), sinf(0.5f) };
     body_def.userData = object;
-    b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+    b2BodyId body_id = b2CreateBody(phy->world, &body_def);
     b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
 
     *object = (CgObject){
@@ -823,7 +827,7 @@ game_init(GameState *game_state)
     body_def.type = b2_staticBody;
     body_def.position = (b2Vec2){ 0.0f, -WORLD_SIZE_Y * 0.5f - 0.5f };
     body_def.userData = object;
-    b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+    b2BodyId body_id = b2CreateBody(phy->world, &body_def);
 
     b2Polygon ground = b2MakeBox(WORLD_SIZE_Y * 2, 0.5f);
     b2ShapeDef ground_def = b2DefaultShapeDef();
@@ -841,7 +845,7 @@ game_init(GameState *game_state)
     body_def.type = b2_staticBody;
     body_def.position = (b2Vec2){ 0.0f, WORLD_SIZE_Y * 0.5f + 0.5f };
     body_def.userData = object;
-    b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+    b2BodyId body_id = b2CreateBody(phy->world, &body_def);
 
     b2Polygon ground = b2MakeBox(WORLD_SIZE_Y * 2, 0.5f);
     b2ShapeDef ground_def = b2DefaultShapeDef();
@@ -864,7 +868,7 @@ game_init(GameState *game_state)
       body_def.position = (b2Vec2){ sign * WORLD_SIZE_Y * 0.75f,
         i * 1.1f };
       body_def.userData = object;
-      b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+      b2BodyId body_id = b2CreateBody(phy->world, &body_def);
       b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
 
       *object = (CgObject){
@@ -885,7 +889,7 @@ game_init(GameState *game_state)
       body_def.position = (b2Vec2){ sign * WORLD_SIZE_Y * 0.75f,
         -i * 1.1f };
       body_def.userData = object;
-      b2BodyId body_id = b2CreateBody(phy_world, &body_def);
+      b2BodyId body_id = b2CreateBody(phy->world, &body_def);
       b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
 
       *object = (CgObject){
