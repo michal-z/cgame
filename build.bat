@@ -137,7 +137,7 @@ IF NOT "%1"=="hlsl" (
     /Yu"pch.h" "src\*.c" ^
     /link %LINK_FLAGS% d3d12.lib dxgi.lib user32.lib ole32.lib windowscodecs.lib ^
     mfplat.lib mfreadwrite.lib ^
-    pch.lib nuklear.lib box2d.lib
+    pch.lib nuklear.lib box2d.lib enkits.lib
 
   IF EXIST "*.obj" DEL "*.obj"
 

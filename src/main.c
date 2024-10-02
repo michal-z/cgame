@@ -24,6 +24,13 @@
 
 #define WORLD_SIZE_Y 12.0f
 
+typedef struct PhyTask
+{
+  enkiTaskSet *task_set;
+  b2TaskCallback *cb;
+  void *cb_context;
+} PhyTask;
+
 typedef struct Mesh
 {
   uint32_t first_vertex;
@@ -59,6 +66,9 @@ typedef struct GameState
     int32_t num_steps;
     b2JointId mouse_joint;
     b2BodyId mouse_fixed_body;
+    enkiTaskScheduler *scheduler;
+    PhyTask tasks[64];
+    int32_t num_tasks;
   } phy;
 } GameState;
 
@@ -71,7 +81,7 @@ __declspec(dllexport) extern const char *D3D12SDKPath = DX12_SDK_PATH;
 static b2Polygon g_box1m;
 static b2ShapeDef g_box1m_def;
 
-void
+static void
 m4x4_ortho_off_center(float4x4 m, float l, float r, float t, float b, float n,
   float f)
 {
@@ -97,7 +107,7 @@ m4x4_ortho_off_center(float4x4 m, float l, float r, float t, float b, float n,
   m[3][3] = 1.0f;
 }
 
-void
+static void
 m4x4_transpose(float4x4 m)
 {
   float4x4 t;
@@ -122,6 +132,45 @@ m4x4_transpose(float4x4 m)
   m[3][1] = t[1][3];
   m[3][2] = t[2][3];
   m[3][3] = t[3][3];
+}
+
+static void
+phy_task_execute_range(uint32_t start_index, uint32_t end_index,
+  uint32_t worker_index, void *args)
+{
+  assert(args);
+  PhyTask *task = (PhyTask *)args;
+  task->cb(start_index, end_index, worker_index, task->cb_context);
+}
+
+static void *
+phy_enqueue_task(b2TaskCallback *cb, int32_t item_count, int32_t min_range,
+  void *cb_context, void *user_context)
+{
+  GameState *game_state = (GameState *)user_context;
+  if (game_state->phy.num_tasks < _countof(game_state->phy.tasks)) {
+    PhyTask *task = &game_state->phy.tasks[game_state->phy.num_tasks];
+    task->cb = cb;
+    task->cb_context = cb_context;
+    enkiAddTaskSetMinRange(game_state->phy.scheduler, task->task_set, task,
+      item_count, min_range);
+    game_state->phy.num_tasks += 1;
+    return task;
+  } else {
+    assert(false && "increase size of GameState.phy.tasks array");
+    cb(0, item_count, 0, cb_context);
+    return NULL;
+  }
+}
+
+static void
+phy_finish_task(void *task_ptr, void *user_context)
+{
+  if (task_ptr != NULL) {
+    PhyTask *task = (PhyTask *)task_ptr;
+    GameState *game_state = (GameState *)user_context;
+    enkiWaitForTaskSet(game_state->phy.scheduler, task->task_set);
+  }
 }
 
 static double
@@ -703,11 +752,29 @@ game_init(GameState *game_state)
   gpu_flush_command_lists(gpu);
   gpu_wait_for_completion(gpu);
 
+  game_state->phy.scheduler = enkiNewTaskScheduler();
+  {
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    // TODO: Get number of physical, performance cores.
+    enkiInitTaskSchedulerNumThreads(game_state->phy.scheduler,
+      info.dwNumberOfProcessors / 2);
+  }
+
+  for (uint32_t i = 0; i < _countof(game_state->phy.tasks); ++i) {
+    game_state->phy.tasks[i].task_set =
+      enkiCreateTaskSet(game_state->phy.scheduler, phy_task_execute_range);
+  }
+
   //
   // Objects
   //
   {
     b2WorldDef world_def = b2DefaultWorldDef();
+    world_def.workerCount = enkiGetNumTaskThreads(game_state->phy.scheduler);
+    world_def.enqueueTask = phy_enqueue_task;
+    world_def.finishTask = phy_finish_task;
+    world_def.userTaskContext = game_state;
     game_state->phy.world = b2CreateWorld(&world_def);
   }
   b2WorldId phy_world = game_state->phy.world;
@@ -839,6 +906,16 @@ game_deinit(GameState *game_state)
 
   b2DestroyWorld(game_state->phy.world);
 
+  if (game_state->phy.scheduler) {
+    for (uint32_t i = 0; i < _countof(game_state->phy.tasks); ++i) {
+      if (game_state->phy.tasks[i].task_set) {
+        enkiDeleteTaskSet(
+          game_state->phy.scheduler, game_state->phy.tasks[i].task_set);
+      }
+    }
+    enkiDeleteTaskScheduler(game_state->phy.scheduler);
+  }
+
   gui_deinit(&game_state->gui_context);
 
   aud_deinit_context(&game_state->audio_context);
@@ -862,6 +939,7 @@ game_update(GameState *game_state)
   GpuContext *gpu = &game_state->gpu_context;
 
   b2World_Step(game_state->phy.world, 1.0f / 60.0f, 1);
+  game_state->phy.num_tasks = 0;
   game_state->phy.num_steps += 1;
 
   for (uint32_t i = 0; i < game_state->objects_num; ++i) {
