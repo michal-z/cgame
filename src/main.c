@@ -13,6 +13,7 @@
 #define FONT_NORMAL_HEIGHT 18.0f
 
 #define MESH_SQUARE_1M 0
+#define MESH_CIRCLE_1M 1
 #define MESH_MAX 32
 #define MESH_INVALID MESH_MAX
 
@@ -82,7 +83,7 @@ __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION;
 __declspec(dllexport) extern const char *D3D12SDKPath = DX12_SDK_PATH;
 
 static b2Polygon g_box1m;
-static b2ShapeDef g_box1m_def;
+static b2ShapeDef g_shape_def;
 
 static void
 m4x4_ortho_off_center(float4x4 m, float l, float r, float t, float b, float n,
@@ -340,7 +341,7 @@ window_handle_event(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
         body_def.position = p;
         body_def.userData = object;
         b2BodyId body_id = b2CreateBody(gs->phy.world, &body_def);
-        b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
+        b2CreatePolygonShape(body_id, &g_shape_def, &g_box1m);
 
         *object = (CgObject){
           .mesh_index = MESH_SQUARE_1M,
@@ -670,6 +671,7 @@ game_init(GameState *game_state)
   {
     const char *filenames[MESH_MAX] = {NULL};
     filenames[MESH_SQUARE_1M] = "assets/meshes/square_1m.mesh";
+    filenames[MESH_CIRCLE_1M] = "assets/meshes/circle_1m.mesh";
 
     ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
     uint64_t total_num_points = 0;
@@ -706,6 +708,7 @@ game_init(GameState *game_state)
     const char *filenames[OBJ_MAX_TEXTURES] = {
       "assets/textures/obj_tex0.png",
       "assets/textures/obj_tex1.png",
+      "assets/textures/obj_tex2.png",
     };
 
     ID3D12GraphicsCommandList10 *cmdlist = gpu_begin_command_list(gpu);
@@ -784,7 +787,7 @@ game_init(GameState *game_state)
   }
 
   g_box1m = b2MakeBox(0.5f, 0.5f);
-  g_box1m_def = b2DefaultShapeDef();
+  g_shape_def = b2DefaultShapeDef();
 
   {
     CgObject *object = &game_state->objects[game_state->objects_num++];
@@ -795,7 +798,7 @@ game_init(GameState *game_state)
     body_def.rotation = (b2Rot){ cosf(0.0f), sinf(0.0f) };
     body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy->world, &body_def);
-    b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
+    b2CreatePolygonShape(body_id, &g_shape_def, &g_box1m);
 
     *object = (CgObject){
       .mesh_index = MESH_SQUARE_1M,
@@ -812,11 +815,11 @@ game_init(GameState *game_state)
     body_def.rotation = (b2Rot){ cosf(0.5f), sinf(0.5f) };
     body_def.userData = object;
     b2BodyId body_id = b2CreateBody(phy->world, &body_def);
-    b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
+    b2CreateCircleShape(body_id, &g_shape_def, &(b2Circle){ .radius = 0.5f });
 
     *object = (CgObject){
-      .mesh_index = MESH_SQUARE_1M,
-      .texture_index = RDH_OBJECT_TEX1,
+      .mesh_index = MESH_CIRCLE_1M,
+      .texture_index = RDH_OBJECT_TEX2,
       .phy_body_id = *(uint64_t *)&body_id,
     };
   }
@@ -869,7 +872,7 @@ game_init(GameState *game_state)
         i * 1.1f };
       body_def.userData = object;
       b2BodyId body_id = b2CreateBody(phy->world, &body_def);
-      b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
+      b2CreatePolygonShape(body_id, &g_shape_def, &g_box1m);
 
       *object = (CgObject){
         .mesh_index = MESH_SQUARE_1M,
@@ -890,7 +893,7 @@ game_init(GameState *game_state)
         -i * 1.1f };
       body_def.userData = object;
       b2BodyId body_id = b2CreateBody(phy->world, &body_def);
-      b2CreatePolygonShape(body_id, &g_box1m_def, &g_box1m);
+      b2CreatePolygonShape(body_id, &g_shape_def, &g_box1m);
 
       *object = (CgObject){
         .mesh_index = MESH_SQUARE_1M,
