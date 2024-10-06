@@ -505,8 +505,14 @@ game_init(GameState *game_state)
       .PS = g_pso_bytecode[PSO_FIRST].ps,
       .BlendState = {
         .RenderTarget = {
-          { .BlendEnable = FALSE,
-            .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL
+          { .BlendEnable = TRUE,
+            .SrcBlend = D3D12_BLEND_SRC_ALPHA,
+            .DestBlend = D3D12_BLEND_INV_SRC_ALPHA,
+            .BlendOp = D3D12_BLEND_OP_ADD,
+            .SrcBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA,
+            .DestBlendAlpha = D3D12_BLEND_ZERO,
+            .BlendOpAlpha = D3D12_BLEND_OP_ADD,
+            .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL,
           },
         },
       },
@@ -522,7 +528,7 @@ game_init(GameState *game_state)
       .DepthStencilState = {
         .DepthEnable = TRUE,
         .DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL,
-        .DepthFunc = D3D12_COMPARISON_FUNC_LESS,
+        .DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL,
       },
       .SampleDesc = { .Count = NUM_MSAA_SAMPLES },
     },
@@ -818,7 +824,7 @@ game_init(GameState *game_state)
     b2CreateCircleShape(body_id, &g_shape_def, &(b2Circle){ .radius = 0.5f });
 
     *object = (CgObject){
-      .mesh_index = MESH_CIRCLE_1M,
+      .mesh_index = MESH_SQUARE_1M,
       .texture_index = RDH_OBJECT_TEX2,
       .phy_body_id = *(uint64_t *)&body_id,
     };

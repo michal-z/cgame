@@ -6,6 +6,9 @@
   "RootConstants(b0, num32BitConstants = 2), " \
   "CBV(b1, visibility = SHADER_VISIBILITY_VERTEX), " \
   "StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR," \
+  " addressU = TEXTURE_ADDRESS_CLAMP," \
+  " addressV = TEXTURE_ADDRESS_CLAMP," \
+  " addressW = TEXTURE_ADDRESS_CLAMP," \
   " visibility = SHADER_VISIBILITY_PIXEL)"
 
 struct RootConst
@@ -58,6 +61,9 @@ void s00_ps(float2 uv : _Uv,
   " CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), " \
   "CBV(b0, visibility = SHADER_VISIBILITY_VERTEX), " \
   "StaticSampler(s0, filter = FILTER_MIN_MAG_MIP_LINEAR," \
+  " addressU = TEXTURE_ADDRESS_CLAMP," \
+  " addressV = TEXTURE_ADDRESS_CLAMP," \
+  " addressW = TEXTURE_ADDRESS_CLAMP," \
   " visibility = SHADER_VISIBILITY_PIXEL)"
 
 struct PerFrameConst
